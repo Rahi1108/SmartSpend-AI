@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Menu, Settings, Shield, Database, LogOut, User as UserIcon, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUIStore } from '../../stores/uiStore';
@@ -12,6 +12,25 @@ export const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Refs for click outside detection
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const settingsMenuItems = [
     { label: 'Notifications', icon: Bell, path: '/settings', tab: 'notifications' },
@@ -38,8 +57,8 @@ export const TopBar: React.FC = () => {
   return (
     <header className="sticky top-0 z-50 border-b border-glass-border/50 bg-background/95 backdrop-blur-xl shadow-sm">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-3">
-        {/* Left Section - Logo & Navigation */}
-        <div className="flex items-center gap-6">
+        {/* Left Section - Brand */}
+        <div className="flex items-center gap-3">
           <button
             onClick={toggleSidebar}
             className="md:hidden p-2 rounded-xl hover:bg-glass-hover transition-all duration-200 hover:scale-105"
@@ -47,39 +66,34 @@ export const TopBar: React.FC = () => {
             <Menu className="h-5 w-5 text-text-secondary" />
           </button>
 
-          {/* Brand */}
+          {/* Brand - Leftmost */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center shadow-sm">
               <span className="text-white font-bold text-sm">SS</span>
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold text-text-primary tracking-tight">SmartSpend AI</h1>
-              <p className="text-xs text-text-muted font-medium">Intelligent Financial Management</p>
-            </div>
+            <h1 className="text-xl font-bold text-text-primary tracking-tight">SmartSpend AI</h1>
           </div>
         </div>
 
         {/* Right Section - Controls & Profile */}
         <div className="flex items-center gap-2">
-          {/* AI Status */}
-          <div className="hidden lg:block">
-            <OllamaStatusIndicator />
-          </div>
-
           {/* Theme Toggle */}
           <div className="p-1">
             <ThemeToggle />
           </div>
 
           {/* Notifications */}
-          <button className="p-2 rounded-xl hover:bg-glass-hover transition-all duration-200 hover:scale-105 relative">
+          <button
+            onClick={() => navigate('/settings?tab=notifications')}
+            className="p-2 rounded-xl hover:bg-glass-hover transition-all duration-200 hover:scale-105 relative"
+          >
             <Bell className="h-5 w-5 text-text-secondary hover:text-text-primary" />
             {/* Notification dot - can be made dynamic */}
             <div className="absolute -top-1 -right-1 w-2 h-2 bg-accent-pink rounded-full"></div>
           </button>
 
           {/* Settings Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={settingsRef}>
             <button
               onClick={() => {
                 setIsSettingsOpen(!isSettingsOpen);
@@ -91,7 +105,7 @@ export const TopBar: React.FC = () => {
             </button>
 
             {isSettingsOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-background/95 backdrop-blur-xl border border-glass-border/50 rounded-xl shadow-xl z-50">
+              <div className="absolute right-0 mt-2 w-56 bg-background border border-glass-border rounded-xl shadow-xl z-50">
                 <div className="p-2">
                   <div className="px-3 py-2 text-xs font-semibold text-text-muted uppercase tracking-wider">
                     Settings
@@ -112,7 +126,7 @@ export const TopBar: React.FC = () => {
           </div>
 
           {/* Profile Dropdown */}
-          <div className="flex items-center gap-3 ml-4 pl-4 border-l border-glass-border/50">
+          <div className="flex items-center gap-3 ml-4 pl-4 border-l border-glass-border/50" ref={profileRef}>
             <div className="text-right hidden md:block">
               <p className="text-sm font-semibold text-text-primary">
                 {user?.email?.split('@')[0] || 'User'}
@@ -130,7 +144,7 @@ export const TopBar: React.FC = () => {
                 }}
                 className="flex items-center gap-2 p-1 rounded-xl hover:bg-glass-hover transition-all duration-200 hover:scale-105"
               >
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center shadow-lg border-2 border-white/20">
                   <span className="text-white text-sm font-bold">
                     {user?.email?.charAt(0).toUpperCase() || 'U'}
                   </span>
@@ -139,10 +153,10 @@ export const TopBar: React.FC = () => {
               </button>
 
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-background/95 backdrop-blur-xl border border-glass-border/50 rounded-xl shadow-xl z-50">
+                <div className="absolute right-0 mt-2 w-64 bg-background border border-glass-border rounded-xl shadow-xl z-50">
                   <div className="p-4 border-b border-glass-border/50">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center shadow-lg border-2 border-white/20">
                         <span className="text-white text-lg font-bold">
                           {user?.email?.charAt(0).toUpperCase() || 'U'}
                         </span>
