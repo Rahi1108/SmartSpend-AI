@@ -1,4 +1,3 @@
-
 # SmartSpend AI - AI-First SaaS for Personal Finance
 
 **Hackathon Project** | **AI-First SaaS** | **Built in 48 Hours**
@@ -181,15 +180,23 @@ User Input → AI Processing → Smart Parsing → Insights Generation → SaaS 
 
 ## 🚀 Getting Started
 
+```bash
 npm install
 npm run dev
 npm run build
+```
+
+---
 
 ## 📋 Environment Setup
 
+```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_key
 VITE_GEMINI_API_KEY=your_gemini_key
+```
+
+---
 
 ## 🤝 Contributing
 
@@ -201,5 +208,4 @@ Built for a hackathon with a focus on **AI innovation + SaaS scalability**.
 
 **MVP Complete | AI-First | SaaS Ready | Deployable**
 
-
-Just tell me 👍
+---
