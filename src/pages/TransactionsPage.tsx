@@ -6,10 +6,8 @@ import { useTransactions } from '../hooks/useTransactions';
 import { formatCurrency } from '../utils/formatters';
 import { Modal } from '../components/common/Modal';
 import { TransactionForm } from '../components/transactions/TransactionForm';
-import { SmartInput } from '../components/transactions/SmartInput';
+import { UnifiedSmartInput } from '../components/common/UnifiedSmartInput';
 import { Button } from '../components/common/Button';
-import type { ParsedExpense } from '../types/ai';
-import type { Transaction } from '../types/database';
 
 export const TransactionsPage: React.FC = () => {
   const { transactions, createTransaction } = useTransactions();
@@ -41,29 +39,25 @@ export const TransactionsPage: React.FC = () => {
     closeAddTransaction();
   };
 
-  const handleExpenseParsed = (parsedExpense: ParsedExpense) => {
-    const transaction: Transaction = {
-      id: Date.now().toString(),
+  const handleSmartInputTransaction = (data: any) => {
+    createTransaction({
       user_id: 'user1',
-      amount: parsedExpense.amount,
-      type: parsedExpense.type,
+      amount: data.amount,
+      type: data.type,
       category_id: null,
-      category_name: parsedExpense.category,
-      description: parsedExpense.description,
-      vendor: parsedExpense.vendor,
-      date: parsedExpense.date,
+      category_name: data.category,
+      description: data.description,
+      vendor: null,
+      date: data.date.toISOString(),
       time: null,
       notes: null,
-      tags: null,
+      tags: data.tags || null,
       is_recurring: false,
       recurring_frequency: null,
       ai_parsed: true,
-      ai_confidence: parsedExpense.confidence,
+      ai_confidence: 1,
       original_input: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    createTransaction(transaction);
+    });
     setShowSmartInput(false);
   };
 
@@ -111,7 +105,12 @@ export const TransactionsPage: React.FC = () => {
                 ✕
               </button>
             </div>
-            <SmartInput onExpenseParsed={handleExpenseParsed} />
+            <UnifiedSmartInput
+              onTransactionAdd={handleSmartInputTransaction}
+              onBudgetAdd={() => {}}
+              onGoalAdd={() => {}}
+              onClose={() => setShowSmartInput(false)}
+            />
           </Card>
         </motion.div>
       )}

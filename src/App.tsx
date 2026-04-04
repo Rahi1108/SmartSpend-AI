@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { useUIStore } from './stores/uiStore';
 import { startOllamaHealthCheck } from './services/ollama';
+import { initializeTestData } from './services/localStorage';
 import { LandingPage } from './pages/LandingPage';
 import { Dashboard } from './pages/Dashboard';
 import { TransactionsPage } from './pages/TransactionsPage';
@@ -22,6 +23,13 @@ function App() {
   useEffect(() => {
     initialize();
 
+    // Initialize test data if not already present
+    const hasInitialized = localStorage.getItem('smartspend_initialized');
+    if (!hasInitialized) {
+      initializeTestData('user1');
+      localStorage.setItem('smartspend_initialized', 'true');
+    }
+
     // Start Ollama health checks on app initialization
     startOllamaHealthCheck(30000); // Check every 30 seconds
 
@@ -38,25 +46,12 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
 
         {/* Protected Routes */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <Outlet />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="budgets" element={<BudgetsPage />} />
-          <Route path="goals" element={<GoalsPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
+        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
+        <Route path="/transactions" element={<ProtectedRoute><AppLayout><TransactionsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/budgets" element={<ProtectedRoute><AppLayout><BudgetsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/goals" element={<ProtectedRoute><AppLayout><GoalsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute><AppLayout><ReportsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><AppLayout><SettingsPage /></AppLayout></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

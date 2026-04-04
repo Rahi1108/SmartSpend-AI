@@ -1,10 +1,32 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '../components/common/Button';
 import { TrendingUp } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 
 export const LandingPage: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuthStore();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return null; // Will redirect
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-surface-secondary flex items-center justify-center p-4">
       <div className="max-w-md w-full text-center space-y-8">

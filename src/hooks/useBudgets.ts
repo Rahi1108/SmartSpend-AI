@@ -8,8 +8,11 @@ import {
 } from '../services/budgets';
 import type { Budget } from '../types/database';
 
+const DEFAULT_USER_ID = 'user1'; // Default user for development/guest mode
+
 export const useBudgets = () => {
   const { user } = useAuth();
+  const userId = user?.id || DEFAULT_USER_ID;
   const queryClient = useQueryClient();
 
   const {
@@ -18,14 +21,13 @@ export const useBudgets = () => {
     error,
     refetch,
   } = useQuery<Budget[]>({
-    queryKey: ['budgets', user?.id],
-    queryFn: () => getBudgets(user!.id),
-    enabled: !!user?.id,
+    queryKey: ['budgets', userId],
+    queryFn: () => getBudgets(userId),
+    enabled: true, // Always enabled, use default userId if not authenticated
   });
 
   const createMutation = useMutation({
-    mutationFn: (budget: Omit<Budget, 'id' | 'created_at' | 'updated_at' | 'user_id'>) =>
-      createBudget({ ...budget, user_id: user!.id }),
+    mutationFn: createBudget,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
     },

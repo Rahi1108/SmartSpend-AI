@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, AlertTriangle } from 'lucide-react';
+import { Plus, AlertTriangle, Sparkles } from 'lucide-react';
 import { useBudgets } from '../hooks/useBudgets';
 import { useTransactions } from '../hooks/useTransactions';
 import { useUIStore } from '../stores/uiStore';
 import { BudgetList } from '../components/budgets/BudgetList';
 import { BudgetForm } from '../components/budgets/BudgetForm';
 import { Modal } from '../components/common/Modal';
+import { UnifiedSmartInput } from '../components/common/UnifiedSmartInput';
 import { Button } from '../components/common/Button';
 import { formatCurrency } from '../utils/formatters';
 import type { Budget } from '../types/database';
@@ -14,6 +15,7 @@ import type { Budget } from '../types/database';
 export const BudgetsPage: React.FC = () => {
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showSmartInput, setShowSmartInput] = useState(false);
 
   const { budgets, createBudget, updateBudget, deleteBudget } = useBudgets();
   const { transactions } = useTransactions();
@@ -46,6 +48,7 @@ export const BudgetsPage: React.FC = () => {
 
   const handleCreateBudget = (data: Partial<Budget> & { category_name: string; amount: number; period: 'weekly' | 'monthly' | 'yearly'; start_date: string }) => {
     createBudget({
+      user_id: 'user1',
       category_name: data.category_name,
       amount: data.amount,
       period: data.period,
@@ -79,6 +82,21 @@ export const BudgetsPage: React.FC = () => {
     }
   };
 
+  const handleSmartInputBudget = (data: any) => {
+    createBudget({
+      user_id: 'user1',
+      category_name: data.category,
+      amount: data.amount,
+      period: data.period,
+      start_date: new Date().toISOString().split('T')[0],
+      alert_threshold: 80,
+      is_active: true,
+      category_id: null,
+      end_date: null,
+    });
+    setShowSmartInput(false);
+  };
+
   const handleCloseModal = () => {
     setSelectedBudget(null);
     setIsEditMode(false);
@@ -93,11 +111,45 @@ export const BudgetsPage: React.FC = () => {
           <h1 className="text-3xl font-bold text-text-primary">Budgets</h1>
           <p className="text-text-secondary mt-1">Track your spending limits and goals</p>
         </div>
-        <Button onClick={openBudgetModal} className="btn-gradient">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Budget
-        </Button>
+        <div className="flex gap-3">
+          <Button onClick={() => setShowSmartInput(!showSmartInput)} variant="outline">
+            <Sparkles className="w-4 h-4 mr-2" />
+            {showSmartInput ? 'Hide AI Input' : 'Quick Entry (AI)'}
+          </Button>
+          <Button onClick={openBudgetModal} className="btn-gradient">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Budget
+          </Button>
+        </div>
       </div>
+
+      {/* AI Smart Input Section */}
+      {showSmartInput && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="bg-gradient-to-br from-accent-purple/10 to-accent-blue/10 border border-accent-purple/20 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-gradient-primary">
+                <Sparkles className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-text-primary">AI-Powered Quick Entry</h3>
+                <p className="text-xs text-text-secondary">Say or type: "Set budget of ₹10000 for food monthly"</p>
+              </div>
+            </div>
+            <UnifiedSmartInput
+              onTransactionAdd={() => {}}
+              onBudgetAdd={handleSmartInputBudget}
+              onGoalAdd={() => {}}
+              onClose={() => setShowSmartInput(false)}
+            />
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

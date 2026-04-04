@@ -8,8 +8,11 @@ import {
 } from '../services/goals';
 import type { Goal } from '../types/database';
 
+const DEFAULT_USER_ID = 'user1'; // Default user for development/guest mode
+
 export const useGoals = () => {
   const { user } = useAuth();
+  const userId = user?.id || DEFAULT_USER_ID;
   const queryClient = useQueryClient();
 
   const {
@@ -18,14 +21,13 @@ export const useGoals = () => {
     error,
     refetch,
   } = useQuery<Goal[]>({
-    queryKey: ['goals', user?.id],
-    queryFn: () => getGoals(user!.id),
-    enabled: !!user?.id,
+    queryKey: ['goals', userId],
+    queryFn: () => getGoals(userId),
+    enabled: true, // Always enabled, use default userId if not authenticated
   });
 
   const createMutation = useMutation({
-    mutationFn: (goal: Omit<Goal, 'id' | 'created_at' | 'updated_at' | 'user_id'>) =>
-      createGoal({ ...goal, user_id: user!.id }),
+    mutationFn: createGoal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
     },

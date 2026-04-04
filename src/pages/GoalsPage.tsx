@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Target, CheckCircle } from 'lucide-react';
+import { Plus, Target, CheckCircle, Sparkles } from 'lucide-react';
 import { useGoals } from '../hooks/useGoals';
 import { useUIStore } from '../stores/uiStore';
 import { GoalsList } from '../components/goals/GoalsList';
 import { GoalForm } from '../components/goals/GoalForm';
 import { Modal } from '../components/common/Modal';
+import { UnifiedSmartInput } from '../components/common/UnifiedSmartInput';
 import { Button } from '../components/common/Button';
 import { formatCurrency, formatPercentage } from '../utils/formatters';
 import type { Goal } from '../types/database';
@@ -13,6 +14,7 @@ import type { Goal } from '../types/database';
 export const GoalsPage: React.FC = () => {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showSmartInput, setShowSmartInput] = useState(false);
 
   const { goals, createGoal, updateGoal, deleteGoal } = useGoals();
   const { isGoalModalOpen, openGoalModal, closeGoalModal } = useUIStore();
@@ -39,6 +41,7 @@ export const GoalsPage: React.FC = () => {
 
   const handleCreateGoal = (data: Partial<Goal> & { name: string; target_amount: number }) => {
     createGoal({
+      user_id: 'user1',
       name: data.name,
       target_amount: data.target_amount,
       description: data.description ?? null,
@@ -72,6 +75,21 @@ export const GoalsPage: React.FC = () => {
     }
   };
 
+  const handleSmartInputGoal = (data: any) => {
+    createGoal({
+      user_id: 'user1',
+      name: data.name,
+      target_amount: data.targetAmount,
+      description: data.description,
+      current_amount: 0,
+      deadline: data.deadline.toISOString(),
+      category: data.category,
+      priority: data.priority,
+      status: 'active',
+    });
+    setShowSmartInput(false);
+  };
+
   const handleCloseModal = () => {
     setSelectedGoal(null);
     setIsEditMode(false);
@@ -86,11 +104,45 @@ export const GoalsPage: React.FC = () => {
           <h1 className="text-3xl font-bold text-text-primary">Goals</h1>
           <p className="text-text-secondary mt-1">Set and track your financial goals</p>
         </div>
-        <Button onClick={openGoalModal} className="btn-gradient">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Goal
-        </Button>
+        <div className="flex gap-3">
+          <Button onClick={() => setShowSmartInput(!showSmartInput)} variant="outline">
+            <Sparkles className="w-4 h-4 mr-2" />
+            {showSmartInput ? 'Hide AI Input' : 'Quick Entry (AI)'}
+          </Button>
+          <Button onClick={openGoalModal} className="btn-gradient">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Goal
+          </Button>
+        </div>
       </div>
+
+      {/* AI Smart Input Section */}
+      {showSmartInput && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="bg-gradient-to-br from-accent-purple/10 to-accent-blue/10 border border-accent-purple/20 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-gradient-primary">
+                <Sparkles className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-text-primary">AI-Powered Quick Entry</h3>
+                <p className="text-xs text-text-secondary">Say or type: "Save ₹50000 for emergency fund by next year"</p>
+              </div>
+            </div>
+            <UnifiedSmartInput
+              onTransactionAdd={() => {}}
+              onBudgetAdd={() => {}}
+              onGoalAdd={handleSmartInputGoal}
+              onClose={() => setShowSmartInput(false)}
+            />
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

@@ -3,29 +3,29 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MicrophoneIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../stores/authStore';
-import { useTransactionStore } from '../stores/transactionStore';
+import { useTransactions } from '../hooks/useTransactions';
 import { useInsights, usePredictions } from '../hooks/useAI';
+import { useBudgets } from '../hooks/useBudgets';
+import { useGoals } from '../hooks/useGoals';
 import { Card } from '../components/common/Card';
 import { Modal } from '../components/common/Modal';
 import { Button } from '../components/common/Button';
 import { TransactionForm } from '../components/transactions/TransactionForm';
-import { SmartInput } from '../components/transactions/SmartInput';
+import { UnifiedSmartInput } from '../components/common/UnifiedSmartInput';
 import { AIInsightsPanel } from '../components/dashboard/AIInsightsPanel';
 import { SpendingChart } from '../components/dashboard/SpendingChart';
 import { CategoryBreakdown } from '../components/dashboard/CategoryBreakdown';
 import { RecentTransactions } from '../components/dashboard/RecentTransactions';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
-import type { Transaction, Budget } from '../types/database';
-import type { ParsedExpense } from '../types/ai';
 
 export const Dashboard: React.FC = () => {
   const { user, profile } = useAuthStore();
-  const { transactions, addTransaction } = useTransactionStore();
+  const { transactions, createTransaction } = useTransactions();
   const { insights, isLoading: isLoadingInsights, fetchInsights } = useInsights();
   const { prediction, fetchPredictions } = usePredictions();
+  const { budgets, createBudget } = useBudgets();
+  const { createGoal } = useGoals();
 
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [showSmartInput, setShowSmartInput] = useState(false);
 
@@ -40,8 +40,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleSubmitTransaction = (data: { amount: number; description: string; category: string; date: Date; type: 'income' | 'expense'; tags?: string[] }) => {
-    const transaction: Transaction = {
-      id: Date.now().toString(),
+    createTransaction({
       user_id: 'user1',
       amount: data.amount,
       type: data.type,
@@ -58,34 +57,9 @@ export const Dashboard: React.FC = () => {
       ai_parsed: false,
       ai_confidence: 1,
       original_input: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    addTransaction(transaction);
+    });
     setIsAddTransactionOpen(false);
   };
-
-  // Mock data for now
-  useEffect(() => {
-    // Mock budgets
-    setBudgets([
-      {
-        id: '1',
-        user_id: 'user1',
-        category_id: null,
-        category_name: 'General',
-        amount: 2000,
-        period: 'monthly',
-        start_date: new Date().toISOString(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        is_active: true,
-        alert_threshold: 80,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ]);
-  }, []);
 
   useEffect(() => {
     if (transactions.length > 0) {
@@ -115,30 +89,53 @@ export const Dashboard: React.FC = () => {
     }
   }, [transactions, budgets, fetchInsights, fetchPredictions]);
 
-  const handleExpenseParsed = (parsedExpense: ParsedExpense) => {
-    const transaction: Transaction = {
-      id: Date.now().toString(),
-      user_id: 'user1', // Mock user
-      amount: parsedExpense.amount,
-      type: 'expense',
+  const handleSmartInputTransaction = (data: any) => {
+    createTransaction({
+      user_id: 'user1',
+      amount: data.amount,
+      type: data.type,
       category_id: null,
-      category_name: parsedExpense.category,
-      description: parsedExpense.description,
+      category_name: data.category,
+      description: data.description,
       vendor: null,
-      date: parsedExpense.date,
+      date: data.date.toISOString(),
       time: null,
       notes: null,
-      tags: null,
+      tags: data.tags || null,
       is_recurring: false,
       recurring_frequency: null,
       ai_parsed: true,
-      ai_confidence: 0.9,
+      ai_confidence: 1,
       original_input: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    addTransaction(transaction);
-    setIsAddingExpense(false);
+    });
+  };
+
+  const handleSmartInputBudget = (data: any) => {
+    createBudget({
+      user_id: 'user1',
+      category_name: data.category,
+      amount: data.amount,
+      period: data.period,
+      start_date: new Date().toISOString().split('T')[0],
+      alert_threshold: 80,
+      is_active: true,
+      category_id: null,
+      end_date: null,
+    });
+  };
+
+  const handleSmartInputGoal = (data: any) => {
+    createGoal({
+      user_id: 'user1',
+      name: data.name,
+      target_amount: data.targetAmount,
+      description: data.description,
+      current_amount: 0,
+      deadline: data.deadline.toISOString(),
+      category: data.category,
+      priority: data.priority,
+      status: 'active',
+    });
   };
 
   // Calculate balance and ensure non-negative for friendly dashboard display
@@ -262,7 +259,12 @@ export const Dashboard: React.FC = () => {
                   <p className="text-xs text-text-secondary">Say or type: "Spent ₹300 on Zomato yesterday"</p>
                 </div>
               </div>
-              <SmartInput onExpenseParsed={handleExpenseParsed} />
+              <UnifiedSmartInput
+                onTransactionAdd={handleSmartInputTransaction}
+                onBudgetAdd={handleSmartInputBudget}
+                onGoalAdd={handleSmartInputGoal}
+                onClose={() => setShowSmartInput(false)}
+              />
             </Card>
           </motion.div>
         )}
@@ -335,13 +337,6 @@ export const Dashboard: React.FC = () => {
             />
           </div>
         </div>
-
-        {/* Smart Input Modal */}
-        {isAddingExpense && (
-          <Modal isOpen={isAddingExpense} onClose={() => setIsAddingExpense(false)} title="Smart Add Transaction">
-            <SmartInput onExpenseParsed={handleExpenseParsed} />
-          </Modal>
-        )}
 
         {/* Transaction Form Modal */}
         <Modal isOpen={isAddTransactionOpen} onClose={handleCloseAddTransaction} title="Add Transaction">

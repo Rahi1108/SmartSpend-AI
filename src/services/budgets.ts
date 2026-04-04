@@ -1,44 +1,54 @@
-import { supabase } from './supabase';
+/**
+ * Budget Service - Chooses between Supabase and In-Memory based on configuration
+ */
+
 import type { Database } from '../types/database';
 
 type BudgetRow = Database['public']['Tables']['budgets']['Row'];
 type BudgetInsert = Database['public']['Tables']['budgets']['Insert'];
 
+const isSupabaseConfigured = (): boolean => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  return !!supabaseUrl && !!supabaseAnonKey;
+};
+
 export const getBudgets = async (userId: string): Promise<BudgetRow[]> => {
-  const { data, error } = await supabase
-    .from('budgets')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_active', true);
-  if (error) throw error;
-  return data || [];
+  if (isSupabaseConfigured()) {
+    const { getBudgets } = await import('./supabaseBudgets');
+    return getBudgets(userId);
+  } else {
+    const { getBudgets } = await import('./inMemoryBudgets');
+    return getBudgets(userId);
+  }
 };
 
 export const createBudget = async (budget: BudgetInsert): Promise<BudgetRow> => {
-  const { data, error } = await (supabase as any)
-    .from('budgets')
-    .insert(budget)
-    .select('*')
-    .single();
-  if (error) throw error;
-  return data;
+  if (isSupabaseConfigured()) {
+    const { createBudget } = await import('./supabaseBudgets');
+    return createBudget(budget);
+  } else {
+    const { createBudget } = await import('./inMemoryBudgets');
+    return createBudget(budget);
+  }
 };
 
 export const updateBudget = async (id: string, updates: Partial<BudgetInsert>): Promise<BudgetRow> => {
-  const { data, error } = await (supabase as any)
-    .from('budgets')
-    .update(updates)
-    .eq('id', id)
-    .select('*')
-    .single();
-  if (error) throw error;
-  return data;
+  if (isSupabaseConfigured()) {
+    const { updateBudget } = await import('./supabaseBudgets');
+    return updateBudget(id, updates);
+  } else {
+    const { updateBudget } = await import('./inMemoryBudgets');
+    return updateBudget(id, updates);
+  }
 };
 
 export const deleteBudget = async (id: string): Promise<void> => {
-  const { error } = await (supabase as any)
-    .from('budgets')
-    .update({ is_active: false })
-    .eq('id', id);
-  if (error) throw error;
+  if (isSupabaseConfigured()) {
+    const { deleteBudget } = await import('./supabaseBudgets');
+    return deleteBudget(id);
+  } else {
+    const { deleteBudget } = await import('./inMemoryBudgets');
+    return deleteBudget(id);
+  }
 };
