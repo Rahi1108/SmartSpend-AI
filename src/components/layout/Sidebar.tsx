@@ -5,8 +5,7 @@ import {
   ArrowsRightLeftIcon, 
   ChartPieIcon, 
   TrophyIcon, 
-  DocumentChartBarIcon, 
-  Cog6ToothIcon 
+  DocumentChartBarIcon
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -15,7 +14,6 @@ const navigation = [
   { name: 'Budgets', href: '/budgets', icon: ChartPieIcon },
   { name: 'Goals', href: '/goals', icon: TrophyIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },
-  { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ];
 
 export const Sidebar: React.FC = () => {

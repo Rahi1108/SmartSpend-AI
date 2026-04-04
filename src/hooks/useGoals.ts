@@ -6,7 +6,10 @@ import {
   updateGoal,
   deleteGoal,
 } from '../services/goals';
-import type { Goal } from '../types/database';
+import { notificationService } from '../services/notifications';
+import type { Goal, Database } from '../types/database';
+
+type GoalInsert = Database['public']['Tables']['goals']['Insert'];
 
 const DEFAULT_USER_ID = 'user1'; // Default user for development/guest mode
 
@@ -26,25 +29,33 @@ export const useGoals = () => {
     enabled: true, // Always enabled, use default userId if not authenticated
   });
 
-  const createMutation = useMutation({
+  const createMutation = useMutation<Goal, unknown, GoalInsert>({
     mutationFn: createGoal,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['goals', userId] });
+    },
+    onError: (error) => {
+      console.error('Goal creation failed:', error);
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Goal> }) =>
-      updateGoal(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
+  const updateMutation = useMutation<Goal, unknown, { id: string; updates: Partial<Goal> }>({
+    mutationFn: ({ id, updates }) => updateGoal(id, updates),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['goals', userId] });
+    },
+    onError: (error) => {
+      console.error('Goal update failed:', error);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteGoal(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['goals', userId] });
+    },
+    onError: (error) => {
+      console.error('Goal delete failed:', error);
     },
   });
 
@@ -53,9 +64,9 @@ export const useGoals = () => {
     isLoading,
     error,
     refetch,
-    createGoal: createMutation.mutate,
-    updateGoal: updateMutation.mutate,
-    deleteGoal: deleteMutation.mutate,
+    createGoal: createMutation.mutateAsync,
+    updateGoal: updateMutation.mutateAsync,
+    deleteGoal: deleteMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,

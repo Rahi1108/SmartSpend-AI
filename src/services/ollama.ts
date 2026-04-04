@@ -24,7 +24,7 @@ export async function checkOllamaHealth(): Promise<OllamaStatus> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    const response = await fetch(`${OLLAMA_CONFIG.url}${OLLAMA_CONFIG.endpoints.health}`, {
+    const response = await fetch(`${OLLAMA_CONFIG.url}${OLLAMA_CONFIG.endpoints.tags}`, {
       method: 'GET',
       signal: controller.signal,
     });

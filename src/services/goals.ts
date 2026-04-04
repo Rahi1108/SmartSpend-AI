@@ -13,8 +13,13 @@ const isSupabaseConfigured = (): boolean => {
   return !!supabaseUrl && !!supabaseAnonKey;
 };
 
+const shouldUseSupabase = (userId: string): boolean => {
+  const DEFAULT_USER_ID = 'user1';
+  return isSupabaseConfigured() && userId !== DEFAULT_USER_ID;
+};
+
 export const getGoals = async (userId: string): Promise<GoalRow[]> => {
-  if (isSupabaseConfigured()) {
+  if (shouldUseSupabase(userId)) {
     const { getGoals } = await import('./supabaseGoals');
     return getGoals(userId);
   } else {
@@ -24,7 +29,7 @@ export const getGoals = async (userId: string): Promise<GoalRow[]> => {
 };
 
 export const createGoal = async (goal: GoalInsert): Promise<GoalRow> => {
-  if (isSupabaseConfigured()) {
+  if (shouldUseSupabase(goal.user_id)) {
     const { createGoal } = await import('./supabaseGoals');
     return createGoal(goal);
   } else {

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile } from '../types/database';
-import { supabase, signIn, signUp, signOut } from '../services/supabase';
+import { supabase, signIn, signUp, signOut, ensureProfile, updateUserMetadata } from '../services/supabase';
 
 interface AuthState {
   user: User | null;
@@ -37,11 +37,7 @@ export const useAuthStore = create<AuthState>()(
           const { data: { session } } = await supabase.auth.getSession();
           
           if (session?.user) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
+            const profile = await ensureProfile(session.user);
             
             set({
               user: session.user,
@@ -63,11 +59,7 @@ export const useAuthStore = create<AuthState>()(
           // Listen for auth changes
           supabase.auth.onAuthStateChange(async (event: any, session: any) => {
             if (event === 'SIGNED_IN' && session?.user) {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
+              const profile = await ensureProfile(session.user);
               
               set({
                 user: session.user,
@@ -97,11 +89,7 @@ export const useAuthStore = create<AuthState>()(
           if (error) throw error;
           
           if (data.user) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', data.user.id)
-              .single();
+            const profile = await ensureProfile(data.user);
             
             set({
               user: data.user,
@@ -144,16 +132,35 @@ export const useAuthStore = create<AuthState>()(
           const user = get().user;
           if (!user) throw new Error('No user logged in');
 
-          const { error } = await supabase
+          const profilePayload = {
+            id: user.id,
+            email: user.email || '',
+            ...updates,
+          };
+
+          const { data, error } = await supabase
             .from('profiles')
-            // @ts-ignore: supabase typings can infer never for dynamic table updates in this setup
-            .update(updates as any)
-            .eq('id', user.id);
+            .upsert(profilePayload)
+            .select('*')
+            .single();
 
           if (error) throw error;
 
+          if (updates.full_name !== undefined) {
+            await updateUserMetadata(updates.full_name);
+          }
+
           set((state) => ({
-            profile: state.profile ? { ...state.profile, ...updates } : null,
+            profile: data,
+            user: state.user
+              ? {
+                  ...state.user,
+                  user_metadata: {
+                    ...state.user.user_metadata,
+                    full_name: updates.full_name ?? state.user.user_metadata?.full_name,
+                  },
+                }
+              : state.user,
           }));
 
           return { error: null };

@@ -13,8 +13,13 @@ const isSupabaseConfigured = (): boolean => {
   return !!supabaseUrl && !!supabaseAnonKey;
 };
 
+const shouldUseSupabase = (userId: string): boolean => {
+  const DEFAULT_USER_ID = 'user1';
+  return isSupabaseConfigured() && userId !== DEFAULT_USER_ID;
+};
+
 export const getBudgets = async (userId: string): Promise<BudgetRow[]> => {
-  if (isSupabaseConfigured()) {
+  if (shouldUseSupabase(userId)) {
     const { getBudgets } = await import('./supabaseBudgets');
     return getBudgets(userId);
   } else {
@@ -24,7 +29,7 @@ export const getBudgets = async (userId: string): Promise<BudgetRow[]> => {
 };
 
 export const createBudget = async (budget: BudgetInsert): Promise<BudgetRow> => {
-  if (isSupabaseConfigured()) {
+  if (shouldUseSupabase(budget.user_id)) {
     const { createBudget } = await import('./supabaseBudgets');
     return createBudget(budget);
   } else {

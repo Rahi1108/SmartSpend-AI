@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, SparklesIcon, MicrophoneIcon } from '@heroicons/react/24/outline';
 import { Button } from './Button';
 import { useSmartInput } from '../../hooks/useSmartInput';
+import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { LoadingSpinner } from './LoadingSpinner';
 
 interface UnifiedSmartInputProps {
@@ -21,6 +22,13 @@ export const UnifiedSmartInput: React.FC<UnifiedSmartInputProps> = ({
   const [textInput, setTextInput] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const { isClassifying, classifiedData, error, classify, getTransactionData, getBudgetData, getGoalData, reset } = useSmartInput();
+  const { isListening, transcript, error: voiceError, isSupported, startListening, stopListening } = useVoiceInput();
+
+  useEffect(() => {
+    if (transcript) {
+      setTextInput(transcript);
+    }
+  }, [transcript]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +114,28 @@ export const UnifiedSmartInput: React.FC<UnifiedSmartInputProps> = ({
                 rows={4}
               />
             </div>
+
+            {isSupported && (
+              <div className="flex flex-col gap-2 mb-4">
+                <Button
+                  type="button"
+                  variant={isListening ? 'danger' : 'secondary'}
+                  className="w-full"
+                  onClick={isListening ? stopListening : startListening}
+                >
+                  <MicrophoneIcon className="w-4 h-4 mr-2" />
+                  {isListening ? 'Stop recording' : 'Record voice'}
+                </Button>
+                {transcript && (
+                  <div className="text-sm text-text-secondary">
+                    <span className="font-medium">Voice input:</span> {transcript}
+                  </div>
+                )}
+                {voiceError && (
+                  <div className="text-sm text-error">{voiceError}</div>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2">
               <Button

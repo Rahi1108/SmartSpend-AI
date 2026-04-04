@@ -7,7 +7,6 @@ export const OLLAMA_CONFIG = {
   endpoints: {
     generate: '/api/generate',
     tags: '/api/tags',
-    health: '/api/health',
   },
 
   // Model selection - can be customized

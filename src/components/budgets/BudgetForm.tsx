@@ -18,17 +18,12 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, o
     period: initialData?.period || 'monthly',
     start_date: initialData?.start_date || new Date().toISOString().split('T')[0],
     alert_threshold: initialData?.alert_threshold || 80,
-    color: initialData?.color || '#5D3FD3',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(form);
   };
-
-  const colors = [
-    '#5D3FD3', '#FF4D8A', '#00C2A8', '#3B82F6', '#F59E0B', '#EF4444', '#10B981'
-  ];
 
   return (
     <motion.div
@@ -77,22 +72,6 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, o
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">Color</label>
-            <div className="flex space-x-2">
-              {colors.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setForm({ ...form, color })}
-                  className={`w-8 h-8 rounded-full border-2 ${
-                    form.color === color ? 'border-accent-purple' : 'border-transparent'
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-          </div>
 
           <div className="flex space-x-3 pt-4">
             <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">

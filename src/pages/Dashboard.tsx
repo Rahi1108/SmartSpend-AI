@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MicrophoneIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, CalendarDaysIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../stores/authStore';
 import { useTransactions } from '../hooks/useTransactions';
-import { useInsights, usePredictions } from '../hooks/useAI';
 import { useBudgets } from '../hooks/useBudgets';
 import { useGoals } from '../hooks/useGoals';
 import { Card } from '../components/common/Card';
@@ -20,14 +19,14 @@ import { BalanceCard } from '../components/dashboard/BalanceCard';
 
 export const Dashboard: React.FC = () => {
   const { user, profile } = useAuthStore();
+  const userId = user?.id || 'user1';
   const { transactions, createTransaction } = useTransactions();
-  const { insights, isLoading: isLoadingInsights, fetchInsights } = useInsights();
-  const { prediction, fetchPredictions } = usePredictions();
   const { budgets, createBudget } = useBudgets();
   const { createGoal } = useGoals();
 
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [showSmartInput, setShowSmartInput] = useState(false);
+  const [chartPeriod, setChartPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'datewise'>('monthly');
 
   const navigate = useNavigate();
 
@@ -41,7 +40,7 @@ export const Dashboard: React.FC = () => {
 
   const handleSubmitTransaction = (data: { amount: number; description: string; category: string; date: Date; type: 'income' | 'expense'; tags?: string[] }) => {
     createTransaction({
-      user_id: 'user1',
+      user_id: userId,
       amount: data.amount,
       type: data.type,
       category_id: null,
@@ -61,37 +60,9 @@ export const Dashboard: React.FC = () => {
     setIsAddTransactionOpen(false);
   };
 
-  useEffect(() => {
-    if (transactions.length > 0) {
-      const formattedTransactions = transactions.map((t) => ({
-        id: t.id,
-        user_id: t.user_id,
-        amount: t.amount,
-        type: t.type,
-        category_id: t.category_id,
-        category_name: t.category_name,
-        description: t.description,
-        vendor: t.vendor,
-        date: t.date,
-        time: t.time,
-        notes: t.notes,
-        tags: t.tags,
-        is_recurring: t.is_recurring,
-        recurring_frequency: t.recurring_frequency,
-        ai_parsed: t.ai_parsed,
-        ai_confidence: t.ai_confidence,
-        original_input: t.original_input,
-        created_at: t.created_at,
-        updated_at: t.updated_at,
-      }));
-      fetchInsights(formattedTransactions, budgets);
-      fetchPredictions(formattedTransactions);
-    }
-  }, [transactions, budgets, fetchInsights, fetchPredictions]);
-
   const handleSmartInputTransaction = (data: any) => {
     createTransaction({
-      user_id: 'user1',
+      user_id: userId,
       amount: data.amount,
       type: data.type,
       category_id: null,
@@ -112,7 +83,7 @@ export const Dashboard: React.FC = () => {
 
   const handleSmartInputBudget = (data: any) => {
     createBudget({
-      user_id: 'user1',
+      user_id: userId,
       category_name: data.category,
       amount: data.amount,
       period: data.period,
@@ -126,7 +97,7 @@ export const Dashboard: React.FC = () => {
 
   const handleSmartInputGoal = (data: any) => {
     createGoal({
-      user_id: 'user1',
+      user_id: userId,
       name: data.name,
       target_amount: data.targetAmount,
       description: data.description,
@@ -144,32 +115,100 @@ export const Dashboard: React.FC = () => {
   const rawBalance = totalIncome - totalExpenses;
   const balance = rawBalance >= 0 ? rawBalance : 0;
 
-  const monthlyMap = new Map<string, { month: string; date: Date; income: number; expenses: number }>();
+  // Dynamic chart data based on selected period
+  const getChartData = () => {
+    const periodMap = new Map<string, { date: Date; income: number; expenses: number }>();
+
+    transactions.forEach((t) => {
+      const parsedDate = new Date(t.date);
+      if (Number.isNaN(parsedDate.getTime())) return;
+
+      let periodKey: string;
+      let displayLabel: string;
+
+      switch (chartPeriod) {
+        case 'daily':
+          periodKey = parsedDate.toISOString().split('T')[0]; // YYYY-MM-DD
+          displayLabel = parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+          break;
+        case 'weekly':
+          const weekStart = new Date(parsedDate);
+          weekStart.setDate(parsedDate.getDate() - parsedDate.getDay()); // Start of week (Sunday)
+          periodKey = weekStart.toISOString().split('T')[0];
+          displayLabel = `Week of ${weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
+          break;
+        case 'monthly':
+          periodKey = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}`;
+          displayLabel = parsedDate.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+          break;
+        case 'yearly':
+          periodKey = String(parsedDate.getFullYear());
+          displayLabel = String(parsedDate.getFullYear());
+          break;
+        case 'datewise':
+        default:
+          periodKey = parsedDate.toISOString().split('T')[0];
+          displayLabel = parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          break;
+      }
+
+      const existingPeriod = periodMap.get(periodKey);
+      if (existingPeriod) {
+        if (t.type === 'income') {
+          existingPeriod.income += t.amount;
+        } else {
+          existingPeriod.expenses += t.amount;
+        }
+      } else {
+        periodMap.set(periodKey, {
+          date: parsedDate,
+          income: t.type === 'income' ? t.amount : 0,
+          expenses: t.type === 'expense' ? t.amount : 0,
+        });
+      }
+    });
+
+    return Array.from(periodMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([periodKey, data]) => {
+        let displayLabel: string;
+        switch (chartPeriod) {
+          case 'daily':
+            displayLabel = new Date(periodKey).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+            break;
+          case 'weekly':
+            const weekStart = new Date(periodKey);
+            displayLabel = `Week of ${weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
+            break;
+          case 'monthly':
+            const [year, month] = periodKey.split('-');
+            displayLabel = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+            break;
+          case 'yearly':
+            displayLabel = periodKey;
+            break;
+          case 'datewise':
+          default:
+            displayLabel = new Date(periodKey).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            break;
+        }
+
+        return {
+          period: displayLabel,
+          income: data.income,
+          expenses: data.expenses,
+          net: data.income - data.expenses,
+        };
+      });
+  };
+
+  const chartData = getChartData();
+
+  // Category breakdown data (unchanged)
   const categoryMap = new Map<string, { category: string; amount: number; color: string }>();
   const colorPalette = ['#FF4D8A', '#00C2A8', '#3B82F6', '#8B5CF6', '#FBBF24', '#14B8A6'];
 
   transactions.forEach((t) => {
-    const parsedDate = new Date(t.date);
-    if (Number.isNaN(parsedDate.getTime())) return;
-
-    const monthLabel = `${parsedDate.toLocaleString('default', { month: 'short' })} ${parsedDate.getFullYear()}`;
-
-    const existingMonth = monthlyMap.get(monthLabel);
-    if (existingMonth) {
-      if (t.type === 'income') {
-        existingMonth.income += t.amount;
-      } else {
-        existingMonth.expenses += t.amount;
-      }
-    } else {
-      monthlyMap.set(monthLabel, {
-        month: monthLabel,
-        date: parsedDate,
-        income: t.type === 'income' ? t.amount : 0,
-        expenses: t.type === 'expense' ? t.amount : 0,
-      });
-    }
-
     if (t.type === 'expense') {
       const categoryKey = t.category_name || 'Uncategorized';
       const existingCategory = categoryMap.get(categoryKey);
@@ -185,15 +224,6 @@ export const Dashboard: React.FC = () => {
       }
     }
   });
-
-  const chartData = Array.from(monthlyMap.values())
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .map((item) => ({
-      month: item.month,
-      income: item.income,
-      expenses: item.expenses,
-      net: item.income - item.expenses,
-    }));
 
   const categoryData = Array.from(categoryMap.values());
 
@@ -274,6 +304,7 @@ export const Dashboard: React.FC = () => {
           balance={balance}
           income={totalIncome}
           expenses={totalExpenses}
+          currency="₹"
         />
 
         {/* Main Grid */}
@@ -282,7 +313,23 @@ export const Dashboard: React.FC = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Spending Chart */}
             <Card>
-              <h2 className="text-xl font-semibold text-text-primary mb-4">Spending Trends</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-text-primary">Spending Trends</h2>
+                <div className="flex items-center gap-2">
+                  <CalendarDaysIcon className="h-4 w-4 text-text-secondary" />
+                  <select
+                    value={chartPeriod}
+                    onChange={(e) => setChartPeriod(e.target.value as typeof chartPeriod)}
+                    className="text-sm bg-background-secondary border border-glass-border rounded-lg px-3 py-1 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-purple"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                    <option value="datewise">Date-wise</option>
+                  </select>
+                </div>
+              </div>
               <SpendingChart data={chartData} />
             </Card>
 
@@ -302,39 +349,7 @@ export const Dashboard: React.FC = () => {
           {/* Right Column */}
           <div className="space-y-6">
             {/* AI Insights */}
-            <AIInsightsPanel
-              insights={insights}
-              prediction={prediction}
-              isLoadingInsights={isLoadingInsights}
-              isLoadingPrediction={false}
-              onRefresh={() => {
-                if (transactions.length > 0) {
-                  const formattedTransactions = transactions.map((t) => ({
-                    id: t.id,
-                    user_id: t.user_id,
-                    amount: t.amount,
-                    type: t.type,
-                    category_id: t.category_id,
-                    category_name: t.category_name,
-                    description: t.description,
-                    vendor: t.vendor,
-                    date: t.date,
-                    time: t.time,
-                    notes: t.notes,
-                    tags: t.tags,
-                    is_recurring: t.is_recurring,
-                    recurring_frequency: t.recurring_frequency,
-                    ai_parsed: t.ai_parsed,
-                    ai_confidence: t.ai_confidence,
-                    original_input: t.original_input,
-                    created_at: t.created_at,
-                    updated_at: t.updated_at,
-                  }));
-                  fetchInsights(formattedTransactions, budgets);
-                  fetchPredictions(formattedTransactions);
-                }
-              }}
-            />
+            <AIInsightsPanel />
           </div>
         </div>
 

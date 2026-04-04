@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Target, CheckCircle, Sparkles } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import { useGoals } from '../hooks/useGoals';
+import { useBudgets } from '../hooks/useBudgets';
+import { useTransactions } from '../hooks/useTransactions';
 import { useUIStore } from '../stores/uiStore';
 import { GoalsList } from '../components/goals/GoalsList';
 import { GoalForm } from '../components/goals/GoalForm';
@@ -10,13 +13,33 @@ import { UnifiedSmartInput } from '../components/common/UnifiedSmartInput';
 import { Button } from '../components/common/Button';
 import { formatCurrency, formatPercentage } from '../utils/formatters';
 import type { Goal } from '../types/database';
+import type { GoalFormData } from '../types/goal';
+
+const VALID_GOAL_CATEGORIES = new Set([
+  'savings',
+  'debt',
+  'investment',
+  'purchase',
+  'emergency',
+  'other',
+]);
+
+const normalizeGoalCategory = (value?: string | null) => {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  return VALID_GOAL_CATEGORIES.has(normalized) ? normalized : 'other';
+};
 
 export const GoalsPage: React.FC = () => {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showSmartInput, setShowSmartInput] = useState(false);
 
+  const { user } = useAuth();
+  const userId = user?.id || 'user1';
   const { goals, createGoal, updateGoal, deleteGoal } = useGoals();
+  const { createBudget } = useBudgets();
+  const { createTransaction } = useTransactions();
   const { isGoalModalOpen, openGoalModal, closeGoalModal } = useUIStore();
 
   // Calculate goal progress
@@ -39,19 +62,24 @@ export const GoalsPage: React.FC = () => {
   const totalCurrentAmount = goals.reduce((sum, g) => sum + g.current_amount, 0);
   const overallProgress = totalTargetAmount > 0 ? (totalCurrentAmount / totalTargetAmount) * 100 : 0;
 
-  const handleCreateGoal = (data: Partial<Goal> & { name: string; target_amount: number }) => {
-    createGoal({
-      user_id: 'user1',
-      name: data.name,
-      target_amount: data.target_amount,
-      description: data.description ?? null,
-      current_amount: data.current_amount ?? 0,
-      deadline: data.deadline ?? null,
-      category: data.category ?? null,
-      priority: data.priority ?? 'medium',
-      status: data.status ?? 'active',
-    });
-    closeGoalModal();
+  const handleCreateGoal = async (data: GoalFormData) => {
+    try {
+      await createGoal({
+        user_id: userId,
+        name: data.name,
+        target_amount: data.target_amount,
+        description: data.description ?? null,
+        current_amount: data.current_amount ?? 0,
+        deadline: data.deadline || null,
+        category: normalizeGoalCategory(data.category),
+        priority: data.priority || 'medium',
+        status: data.status ?? 'active',
+      });
+      closeGoalModal();
+    } catch (error) {
+      console.error('Goal save failed:', error);
+      alert('Unable to save goal. Check the console for details.');
+    }
   };
 
   const handleEditGoal = (goal: Goal) => {
@@ -75,19 +103,71 @@ export const GoalsPage: React.FC = () => {
     }
   };
 
-  const handleSmartInputGoal = (data: any) => {
-    createGoal({
-      user_id: 'user1',
-      name: data.name,
-      target_amount: data.targetAmount,
-      description: data.description,
-      current_amount: 0,
-      deadline: data.deadline.toISOString(),
-      category: data.category,
-      priority: data.priority,
-      status: 'active',
-    });
-    setShowSmartInput(false);
+  const handleSmartInputTransaction = async (data: any) => {
+    try {
+      await createTransaction({
+        user_id: userId,
+        amount: data.amount,
+        type: data.type,
+        category_id: null,
+        category_name: data.category,
+        description: data.description,
+        vendor: null,
+        date: data.date?.toISOString?.() || new Date().toISOString(),
+        time: null,
+        notes: null,
+        tags: data.tags || null,
+        is_recurring: false,
+        recurring_frequency: null,
+        ai_parsed: true,
+        ai_confidence: 1,
+        original_input: data.description || null,
+      });
+      setShowSmartInput(false);
+    } catch (error) {
+      console.error('Goal page transaction save failed:', error);
+      alert('Unable to save transaction. Check the console for details.');
+    }
+  };
+
+  const handleSmartInputBudget = async (data: any) => {
+    try {
+      await createBudget({
+        user_id: userId,
+        category_name: data.category,
+        amount: data.amount,
+        period: data.period,
+        start_date: new Date().toISOString().split('T')[0],
+        alert_threshold: 0.8,
+        is_active: true,
+        category_id: null,
+        end_date: null,
+      });
+      setShowSmartInput(false);
+    } catch (error) {
+      console.error('Goal page budget save failed:', error);
+      alert('Unable to save budget. Check the console for details.');
+    }
+  };
+
+  const handleSmartInputGoal = async (data: any) => {
+    try {
+      await createGoal({
+        user_id: userId,
+        name: data.goalName || data.description || 'New Goal',
+        target_amount: data.amount,
+        description: data.description || null,
+        current_amount: 0,
+        deadline: data.deadline ? data.deadline.toISOString?.() : null,
+        category: data.category || null,
+        priority: data.priority || 'medium',
+        status: 'active',
+      });
+      setShowSmartInput(false);
+    } catch (error) {
+      console.error('Goal smart save failed:', error);
+      alert('Unable to save goal. Check the console for details.');
+    }
   };
 
   const handleCloseModal = () => {
@@ -135,8 +215,8 @@ export const GoalsPage: React.FC = () => {
               </div>
             </div>
             <UnifiedSmartInput
-              onTransactionAdd={() => {}}
-              onBudgetAdd={() => {}}
+              onTransactionAdd={handleSmartInputTransaction}
+              onBudgetAdd={handleSmartInputBudget}
               onGoalAdd={handleSmartInputGoal}
               onClose={() => setShowSmartInput(false)}
             />

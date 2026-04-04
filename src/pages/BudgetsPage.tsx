@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, AlertTriangle, Sparkles } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import { useBudgets } from '../hooks/useBudgets';
 import { useTransactions } from '../hooks/useTransactions';
+import { useGoals } from '../hooks/useGoals';
 import { useUIStore } from '../stores/uiStore';
 import { BudgetList } from '../components/budgets/BudgetList';
 import { BudgetForm } from '../components/budgets/BudgetForm';
@@ -11,14 +13,18 @@ import { UnifiedSmartInput } from '../components/common/UnifiedSmartInput';
 import { Button } from '../components/common/Button';
 import { formatCurrency } from '../utils/formatters';
 import type { Budget } from '../types/database';
+import type { BudgetFormData } from '../types/budget';
 
 export const BudgetsPage: React.FC = () => {
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showSmartInput, setShowSmartInput] = useState(false);
 
+  const { user } = useAuth();
+  const userId = user?.id || 'user1';
   const { budgets, createBudget, updateBudget, deleteBudget } = useBudgets();
-  const { transactions } = useTransactions();
+  const { transactions, createTransaction } = useTransactions();
+  const { createGoal } = useGoals();
   const { isBudgetModalOpen, openBudgetModal, closeBudgetModal } = useUIStore();
 
   // Calculate budget progress and alerts
@@ -46,19 +52,24 @@ export const BudgetsPage: React.FC = () => {
   const overBudgetCount = budgetsWithProgress.filter(b => b.isOverBudget).length;
   const nearLimitCount = budgetsWithProgress.filter(b => b.isNearLimit && !b.isOverBudget).length;
 
-  const handleCreateBudget = (data: Partial<Budget> & { category_name: string; amount: number; period: 'weekly' | 'monthly' | 'yearly'; start_date: string }) => {
-    createBudget({
-      user_id: 'user1',
-      category_name: data.category_name,
-      amount: data.amount,
-      period: data.period,
-      start_date: data.start_date,
-      alert_threshold: data.alert_threshold ?? 80,
-      is_active: true,
-      category_id: null,
-      end_date: null,
-    });
-    closeBudgetModal();
+  const handleCreateBudget = async (data: BudgetFormData) => {
+    try {
+      await createBudget({
+        user_id: userId,
+        category_name: data.category_name,
+        amount: data.amount,
+        period: data.period,
+        start_date: data.start_date || new Date().toISOString().split('T')[0],
+        alert_threshold: data.alert_threshold > 1 ? data.alert_threshold / 100 : data.alert_threshold ?? 0.8,
+        is_active: true,
+        category_id: null,
+        end_date: null,
+      });
+      closeBudgetModal();
+    } catch (error) {
+      console.error('Budget save failed:', error);
+      alert('Unable to save budget. Check the console for details.');
+    }
   };
 
   const handleEditBudget = (budget: Budget) => {
@@ -82,19 +93,71 @@ export const BudgetsPage: React.FC = () => {
     }
   };
 
-  const handleSmartInputBudget = (data: any) => {
-    createBudget({
-      user_id: 'user1',
-      category_name: data.category,
-      amount: data.amount,
-      period: data.period,
-      start_date: new Date().toISOString().split('T')[0],
-      alert_threshold: 80,
-      is_active: true,
-      category_id: null,
-      end_date: null,
-    });
-    setShowSmartInput(false);
+  const handleSmartInputTransaction = async (data: any) => {
+    try {
+      await createTransaction({
+        user_id: userId,
+        amount: data.amount,
+        type: data.type,
+        category_id: null,
+        category_name: data.category,
+        description: data.description,
+        vendor: null,
+        date: data.date?.toISOString?.() || new Date().toISOString(),
+        time: null,
+        notes: null,
+        tags: data.tags || null,
+        is_recurring: false,
+        recurring_frequency: null,
+        ai_parsed: true,
+        ai_confidence: 1,
+        original_input: data.description || null,
+      });
+      setShowSmartInput(false);
+    } catch (error) {
+      console.error('Budget page transaction save failed:', error);
+      alert('Unable to save transaction. Check the console for details.');
+    }
+  };
+
+  const handleSmartInputBudget = async (data: any) => {
+    try {
+      await createBudget({
+        user_id: userId,
+        category_name: data.category,
+        amount: data.amount,
+        period: data.period,
+        start_date: new Date().toISOString().split('T')[0],
+        alert_threshold: 0.8,
+        is_active: true,
+        category_id: null,
+        end_date: null,
+      });
+      setShowSmartInput(false);
+    } catch (error) {
+      console.error('Budget smart save failed:', error);
+      alert('Unable to save budget. Check the console for details.');
+    }
+  };
+
+  const handleSmartInputGoal = async (data: any) => {
+    try {
+      await createGoal({
+        user_id: userId,
+        name: data.goalName || data.description || 'New Goal',
+        target_amount: data.amount,
+        description: data.description || null,
+        current_amount: 0,
+        deadline: data.deadline ? data.deadline.toISOString?.() : null,
+        category: data.category || null,
+        priority: data.priority || 'medium',
+        status: 'active',
+      });
+      setShowSmartInput(false);
+    } catch (error) {
+      console.error('Budget page goal save failed:', error);
+      alert('Unable to save goal. Check the console for details.');
+    }
   };
 
   const handleCloseModal = () => {
@@ -142,9 +205,9 @@ export const BudgetsPage: React.FC = () => {
               </div>
             </div>
             <UnifiedSmartInput
-              onTransactionAdd={() => {}}
+              onTransactionAdd={handleSmartInputTransaction}
               onBudgetAdd={handleSmartInputBudget}
-              onGoalAdd={() => {}}
+              onGoalAdd={handleSmartInputGoal}
               onClose={() => setShowSmartInput(false)}
             />
           </div>

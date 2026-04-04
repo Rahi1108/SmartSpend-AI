@@ -1,29 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Shield, Palette, Database, LogOut } from 'lucide-react';
+import { User, Bell, Shield, Database, LogOut } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useUIStore } from '../stores/uiStore';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { Modal } from '../components/common/Modal';
+import { getNotificationPreferences, saveNotificationPreferences } from '../services/email';
+import type { NotificationPreferences } from '../services/email';
 
 export const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'security' | 'appearance' | 'data'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'security' | 'data'>('profile');
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
+    budgetAlerts: true,
+    goalMilestones: true,
+    weeklyReports: true,
+    aiInsights: true
+  });
 
-  const { user, updateProfile, signOut } = useAuth();
-  const { theme, toggleTheme } = useUIStore();
+  const { user, profile, updateProfile, signOut } = useAuth();
+
+  useEffect(() => {
+    if (user?.id) {
+      const prefs = getNotificationPreferences(user.id);
+      setNotificationPrefs(prefs);
+    }
+  }, [user?.id]);
+
+  const handleNotificationPreferenceChange = (key: keyof NotificationPreferences, value: boolean) => {
+    const newPrefs = { ...notificationPrefs, [key]: value };
+    setNotificationPrefs(newPrefs);
+    if (user?.id) {
+      saveNotificationPreferences(user.id, newPrefs);
+    }
+  };
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Shield },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'data', label: 'Data & Privacy', icon: Database },
   ];
 
-  const handleProfileUpdate = (data: { name?: string; email?: string }) => {
+  const handleProfileUpdate = (data: { full_name?: string; email?: string }) => {
     updateProfile(data);
   };
 
@@ -39,9 +60,9 @@ export const SettingsPage: React.FC = () => {
         <div className="space-y-4">
           <Input
             label="Full Name"
-            defaultValue={user?.user_metadata?.name || ''}
+            defaultValue={profile?.full_name || user?.user_metadata?.full_name || ''}
             placeholder="Enter your full name"
-            onChange={(value) => handleProfileUpdate({ name: value })}
+            onChange={(value) => handleProfileUpdate({ full_name: value })}
           />
           <Input
             label="Email"
@@ -80,35 +101,70 @@ export const SettingsPage: React.FC = () => {
   const renderNotificationsTab = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Notification Preferences</h3>
+        <h3 className="text-lg font-semibold text-text-primary mb-4">Email Notification Preferences</h3>
+        <p className="text-sm text-text-secondary mb-4">
+          Choose which notifications you'd like to receive via email. These settings will be saved automatically.
+        </p>
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 bg-surface-secondary rounded-lg">
             <div>
               <p className="font-medium text-text-primary">Budget Alerts</p>
               <p className="text-sm text-text-secondary">Get notified when you exceed budget limits</p>
             </div>
-            <input type="checkbox" className="toggle" defaultChecked />
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={notificationPrefs.budgetAlerts}
+                onChange={(e) => handleNotificationPreferenceChange('budgetAlerts', e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-accent-purple/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+            </label>
           </div>
           <div className="flex items-center justify-between p-4 bg-surface-secondary rounded-lg">
             <div>
               <p className="font-medium text-text-primary">Goal Milestones</p>
               <p className="text-sm text-text-secondary">Celebrate when you reach goal milestones</p>
             </div>
-            <input type="checkbox" className="toggle" defaultChecked />
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={notificationPrefs.goalMilestones}
+                onChange={(e) => handleNotificationPreferenceChange('goalMilestones', e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-accent-purple/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+            </label>
           </div>
           <div className="flex items-center justify-between p-4 bg-surface-secondary rounded-lg">
             <div>
               <p className="font-medium text-text-primary">Weekly Reports</p>
               <p className="text-sm text-text-secondary">Receive weekly spending summaries</p>
             </div>
-            <input type="checkbox" className="toggle" defaultChecked />
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={notificationPrefs.weeklyReports}
+                onChange={(e) => handleNotificationPreferenceChange('weeklyReports', e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-accent-purple/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+            </label>
           </div>
           <div className="flex items-center justify-between p-4 bg-surface-secondary rounded-lg">
             <div>
               <p className="font-medium text-text-primary">AI Insights</p>
               <p className="text-sm text-text-secondary">Get personalized financial insights</p>
             </div>
-            <input type="checkbox" className="toggle" defaultChecked />
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={notificationPrefs.aiInsights}
+                onChange={(e) => handleNotificationPreferenceChange('aiInsights', e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-accent-purple/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+            </label>
           </div>
         </div>
       </div>
@@ -144,61 +200,7 @@ export const SettingsPage: React.FC = () => {
     </div>
   );
 
-  const renderAppearanceTab = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Theme</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <button
-            onClick={() => toggleTheme()}
-            className={`p-4 rounded-lg border-2 transition-all ${
-              theme === 'light'
-                ? 'border-accent-purple bg-accent-purple/10'
-                : 'border-border bg-surface-secondary'
-            }`}
-          >
-            <div className="text-center">
-              <div className="w-8 h-8 bg-white border border-border rounded mx-auto mb-2"></div>
-              <p className="font-medium text-text-primary">Light</p>
-            </div>
-          </button>
-          <button
-            onClick={() => toggleTheme()}
-            className={`p-4 rounded-lg border-2 transition-all ${
-              theme === 'dark'
-                ? 'border-accent-purple bg-accent-purple/10'
-                : 'border-border bg-surface-secondary'
-            }`}
-          >
-            <div className="text-center">
-              <div className="w-8 h-8 bg-gray-900 border border-border rounded mx-auto mb-2"></div>
-              <p className="font-medium text-text-primary">Dark</p>
-            </div>
-          </button>
-        </div>
-      </div>
 
-      <div>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Display Options</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-surface-secondary rounded-lg">
-            <div>
-              <p className="font-medium text-text-primary">Compact Mode</p>
-              <p className="text-sm text-text-secondary">Show more content in less space</p>
-            </div>
-            <input type="checkbox" className="toggle" />
-          </div>
-          <div className="flex items-center justify-between p-4 bg-surface-secondary rounded-lg">
-            <div>
-              <p className="font-medium text-text-primary">Animations</p>
-              <p className="text-sm text-text-secondary">Enable smooth transitions and animations</p>
-            </div>
-            <input type="checkbox" className="toggle" defaultChecked />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   const renderDataTab = () => (
     <div className="space-y-6">
@@ -254,8 +256,6 @@ export const SettingsPage: React.FC = () => {
         return renderNotificationsTab();
       case 'security':
         return renderSecurityTab();
-      case 'appearance':
-        return renderAppearanceTab();
       case 'data':
         return renderDataTab();
       default:

@@ -8,5 +8,4 @@ export interface BudgetFormData {
   period: 'weekly' | 'monthly' | 'yearly';
   start_date: string;
   alert_threshold: number;
-  color?: string;
 }

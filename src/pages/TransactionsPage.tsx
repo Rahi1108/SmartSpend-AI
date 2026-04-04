@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MicrophoneIcon } from '@heroicons/react/24/outline';
 import { Card } from '../components/common/Card';
+import { useAuth } from '../hooks/useAuth';
 import { useTransactions } from '../hooks/useTransactions';
+import { useBudgets } from '../hooks/useBudgets';
+import { useGoals } from '../hooks/useGoals';
 import { formatCurrency } from '../utils/formatters';
 import { Modal } from '../components/common/Modal';
 import { TransactionForm } from '../components/transactions/TransactionForm';
@@ -10,7 +13,11 @@ import { UnifiedSmartInput } from '../components/common/UnifiedSmartInput';
 import { Button } from '../components/common/Button';
 
 export const TransactionsPage: React.FC = () => {
+  const { user } = useAuth();
+  const userId = user?.id || 'user1';
   const { transactions, createTransaction } = useTransactions();
+  const { createBudget } = useBudgets();
+  const { createGoal } = useGoals();
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [showSmartInput, setShowSmartInput] = useState(false);
 
@@ -19,7 +26,7 @@ export const TransactionsPage: React.FC = () => {
 
   const handleSubmit = (data: { amount: number; description: string; category: string; date: Date; type: 'income' | 'expense'; tags?: string[] }) => {
     createTransaction({
-      user_id: 'user1',
+      user_id: userId,
       amount: data.amount,
       type: data.type,
       category_id: null,
@@ -41,7 +48,7 @@ export const TransactionsPage: React.FC = () => {
 
   const handleSmartInputTransaction = (data: any) => {
     createTransaction({
-      user_id: 'user1',
+      user_id: userId,
       amount: data.amount,
       type: data.type,
       category_id: null,
@@ -59,6 +66,46 @@ export const TransactionsPage: React.FC = () => {
       original_input: null,
     });
     setShowSmartInput(false);
+  };
+
+  const handleSmartInputBudget = async (data: any) => {
+    try {
+      await createBudget({
+        user_id: userId,
+        category_name: data.category,
+        amount: data.amount,
+        period: data.period,
+        start_date: new Date().toISOString().split('T')[0],
+        alert_threshold: 0.8,
+        is_active: true,
+        category_id: null,
+        end_date: null,
+      });
+      setShowSmartInput(false);
+    } catch (error) {
+      console.error('Transactions page budget save failed:', error);
+      alert('Unable to save budget. Check the console for details.');
+    }
+  };
+
+  const handleSmartInputGoal = async (data: any) => {
+    try {
+      await createGoal({
+        user_id: userId,
+        name: data.goalName || data.description || 'New Goal',
+        target_amount: data.amount,
+        description: data.description || null,
+        current_amount: 0,
+        deadline: data.deadline ? data.deadline.toISOString?.() : null,
+        category: data.category || null,
+        priority: data.priority || 'medium',
+        status: 'active',
+      });
+      setShowSmartInput(false);
+    } catch (error) {
+      console.error('Transactions page goal save failed:', error);
+      alert('Unable to save goal. Check the console for details.');
+    }
   };
 
   return (
@@ -107,8 +154,8 @@ export const TransactionsPage: React.FC = () => {
             </div>
             <UnifiedSmartInput
               onTransactionAdd={handleSmartInputTransaction}
-              onBudgetAdd={() => {}}
-              onGoalAdd={() => {}}
+              onBudgetAdd={handleSmartInputBudget}
+              onGoalAdd={handleSmartInputGoal}
               onClose={() => setShowSmartInput(false)}
             />
           </Card>

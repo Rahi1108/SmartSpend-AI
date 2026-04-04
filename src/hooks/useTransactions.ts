@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTransactions, createTransaction, updateTransaction, deleteTransaction } from '../services/transactions';
 import { useAuth } from './useAuth';
-import type { Transaction } from '../types/database';
+import type { Transaction, Database } from '../types/database';
+
+type TransactionInsert = Database['public']['Tables']['transactions']['Insert'];
 
 const DEFAULT_USER_ID = 'user1'; // Default user for development/guest mode
 
@@ -16,33 +18,36 @@ export function useTransactions() {
     enabled: true, // Always enabled, use default userId if not authenticated
   });
 
-  const createTransactionMutation = useMutation({
+  const createTransactionMutation = useMutation<Transaction, unknown, TransactionInsert>({
     mutationFn: createTransaction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions', userId] });
+    },
+    onError: (error) => {
+      console.error('Transaction creation failed:', error);
     },
   });
 
-  const updateTransactionMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: any }) =>
+  const updateTransactionMutation = useMutation<Transaction, unknown, { id: string; updates: any }>({
+    mutationFn: ({ id, updates }) =>
       updateTransaction(id, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions', userId] });
     },
   });
 
-  const deleteTransactionMutation = useMutation({
+  const deleteTransactionMutation = useMutation<void, unknown, string>({
     mutationFn: deleteTransaction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions', userId] });
     },
   });
 
   return {
     transactions,
     isLoading,
-    createTransaction: createTransactionMutation.mutate,
-    updateTransaction: updateTransactionMutation.mutate,
-    deleteTransaction: deleteTransactionMutation.mutate,
+    createTransaction: createTransactionMutation.mutateAsync,
+    updateTransaction: updateTransactionMutation.mutateAsync,
+    deleteTransaction: deleteTransactionMutation.mutateAsync,
   };
 }

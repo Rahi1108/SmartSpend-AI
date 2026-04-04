@@ -7,6 +7,7 @@ import type { Database } from '../types/database';
 
 type BudgetRow = Database['public']['Tables']['budgets']['Row'];
 type BudgetInsert = Database['public']['Tables']['budgets']['Insert'];
+type BudgetInsertWithTimestamps = BudgetInsert & { created_at: string; updated_at: string };
 
 export const getBudgets = async (userId: string): Promise<BudgetRow[]> => {
   const { data, error } = await supabase
@@ -19,9 +20,15 @@ export const getBudgets = async (userId: string): Promise<BudgetRow[]> => {
 };
 
 export const createBudget = async (budget: BudgetInsert): Promise<BudgetRow> => {
+  const timestampedBudget: BudgetInsertWithTimestamps = {
+    ...budget,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('budgets')
-    .insert(budget)
+    .insert(timestampedBudget)
     .select('*')
     .single();
   if (error) throw error;
@@ -29,9 +36,14 @@ export const createBudget = async (budget: BudgetInsert): Promise<BudgetRow> => 
 };
 
 export const updateBudget = async (id: string, updates: Partial<BudgetInsert>): Promise<BudgetRow> => {
+  const updatesWithTimestamp = {
+    ...updates,
+    updated_at: new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('budgets')
-    .update(updates)
+    .update(updatesWithTimestamp)
     .eq('id', id)
     .select('*')
     .single();

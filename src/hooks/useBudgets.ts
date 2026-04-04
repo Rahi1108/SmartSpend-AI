@@ -6,7 +6,10 @@ import {
   updateBudget,
   deleteBudget,
 } from '../services/budgets';
-import type { Budget } from '../types/database';
+import { notificationService } from '../services/notifications';
+import type { Budget, Database } from '../types/database';
+
+type BudgetInsert = Database['public']['Tables']['budgets']['Insert'];
 
 const DEFAULT_USER_ID = 'user1'; // Default user for development/guest mode
 
@@ -26,25 +29,33 @@ export const useBudgets = () => {
     enabled: true, // Always enabled, use default userId if not authenticated
   });
 
-  const createMutation = useMutation({
+  const createMutation = useMutation<Budget, unknown, BudgetInsert>({
     mutationFn: createBudget,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets', userId] });
+    },
+    onError: (error) => {
+      console.error('Budget creation failed:', error);
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Budget> }) =>
-      updateBudget(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+  const updateMutation = useMutation<Budget, unknown, { id: string; updates: Partial<Budget> }>({
+    mutationFn: ({ id, updates }) => updateBudget(id, updates),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets', userId] });
+    },
+    onError: (error) => {
+      console.error('Budget update failed:', error);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteBudget(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets', userId] });
+    },
+    onError: (error) => {
+      console.error('Budget delete failed:', error);
     },
   });
 
@@ -53,9 +64,9 @@ export const useBudgets = () => {
     isLoading,
     error,
     refetch,
-    createBudget: createMutation.mutate,
-    updateBudget: updateMutation.mutate,
-    deleteBudget: deleteMutation.mutate,
+    createBudget: createMutation.mutateAsync,
+    updateBudget: updateMutation.mutateAsync,
+    deleteBudget: deleteMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,

@@ -13,8 +13,13 @@ const isSupabaseConfigured = (): boolean => {
   return !!supabaseUrl && !!supabaseAnonKey;
 };
 
+const shouldUseSupabase = (userId: string): boolean => {
+  const DEFAULT_USER_ID = 'user1';
+  return isSupabaseConfigured() && userId !== DEFAULT_USER_ID;
+};
+
 export const getTransactions = async (userId: string): Promise<TransactionRow[]> => {
-  if (isSupabaseConfigured()) {
+  if (shouldUseSupabase(userId)) {
     const { getTransactions } = await import('./supabaseTransactions');
     return getTransactions(userId);
   } else {
@@ -24,7 +29,7 @@ export const getTransactions = async (userId: string): Promise<TransactionRow[]>
 };
 
 export const createTransaction = async (transaction: TransactionInsert): Promise<TransactionRow> => {
-  if (isSupabaseConfigured()) {
+  if (shouldUseSupabase(transaction.user_id)) {
     const { createTransaction } = await import('./supabaseTransactions');
     return createTransaction(transaction);
   } else {

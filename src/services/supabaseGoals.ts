@@ -7,6 +7,7 @@ import type { Database } from '../types/database';
 
 type GoalRow = Database['public']['Tables']['goals']['Row'];
 type GoalInsert = Database['public']['Tables']['goals']['Insert'];
+type GoalInsertWithTimestamps = GoalInsert & { created_at: string; updated_at: string };
 
 export const getGoals = async (userId: string): Promise<GoalRow[]> => {
   const { data, error } = await supabase
@@ -19,9 +20,15 @@ export const getGoals = async (userId: string): Promise<GoalRow[]> => {
 };
 
 export const createGoal = async (goal: GoalInsert): Promise<GoalRow> => {
+  const timestampedGoal: GoalInsertWithTimestamps = {
+    ...goal,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('goals')
-    .insert(goal)
+    .insert(timestampedGoal)
     .select('*')
     .single();
   if (error) throw error;
@@ -29,9 +36,14 @@ export const createGoal = async (goal: GoalInsert): Promise<GoalRow> => {
 };
 
 export const updateGoal = async (id: string, updates: Partial<GoalInsert>): Promise<GoalRow> => {
+  const updatesWithTimestamp = {
+    ...updates,
+    updated_at: new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('goals')
-    .update(updates)
+    .update(updatesWithTimestamp)
     .eq('id', id)
     .select('*')
     .single();
