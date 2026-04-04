@@ -3,7 +3,6 @@ import { Bell, Menu, Settings, Shield, Database, LogOut, User as UserIcon, Chevr
 import { useNavigate } from 'react-router-dom';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuth } from '../../hooks/useAuth';
-import { OllamaStatusIndicator } from '../ai/OllamaStatusIndicator';
 import { ThemeToggle } from '../common/ThemeToggle';
 
 export const TopBar: React.FC = () => {

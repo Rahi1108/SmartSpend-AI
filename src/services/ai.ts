@@ -1,9 +1,19 @@
-import { OLLAMA_CONFIG } from '../constants/config';
-import { getOllamaStatus } from './ollama';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Ollama Configuration
-const OLLAMA_URL = `${OLLAMA_CONFIG.url}${OLLAMA_CONFIG.endpoints.generate}`;
-const OLLAMA_MODEL = OLLAMA_CONFIG.models.default;
+// Gemini Configuration
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'your-gemini-api-key-here';
+console.log('Gemini API Key loaded:', GEMINI_API_KEY ? 'Yes' : 'No', GEMINI_API_KEY.substring(0, 10) + '...');
+
+let genAI: GoogleGenerativeAI;
+let model: any;
+
+try {
+  genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  console.log('Gemini model initialized successfully');
+} catch (error) {
+  console.error('Failed to initialize Gemini model:', error);
+}
 
 // Types for AI responses
 export interface ParsedExpense {
@@ -32,61 +42,50 @@ export interface SpendingPrediction {
 }
 
 /**
- * Utility function to call Ollama API with timeout
+ * Test Gemini API connection
  */
-async function callOllama(
-  prompt: string,
-  temperature: number = 0.3,
-  timeoutMs: number = OLLAMA_CONFIG.timeout.parse
-): Promise<string> {
-  const status = getOllamaStatus();
-  if (!status.isOnline) {
-    throw new Error(OLLAMA_CONFIG.messages.offline);
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
+export async function testGeminiConnection(): Promise<boolean> {
   try {
-    const response = await fetch(OLLAMA_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: 'Hello, respond with "Gemini is working!"' }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 50,
       },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: prompt,
-        stream: false,
-        temperature: temperature,
-      }),
-      signal: controller.signal,
     });
 
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(OLLAMA_CONFIG.messages.noModel);
-      }
-      throw new Error(`${OLLAMA_CONFIG.messages.error} (${response.status})`);
-    }
-
-    const data = await response.json();
-
-    if (!data.response) {
-      throw new Error('No response from Ollama');
-    }
-
-    return data.response;
+    const response = result.response;
+    const text = response.text();
+    console.log('Gemini test response:', text);
+    return text.includes('Gemini is working');
   } catch (error) {
-    clearTimeout(timer);
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        throw new Error(OLLAMA_CONFIG.messages.timeout);
-      }
-      throw error;
+    console.error('Gemini test failed:', error);
+    return false;
+  }
+}
+async function callGemini(prompt: string, temperature: number = 0.3): Promise<string> {
+  console.log('Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: temperature,
+        maxOutputTokens: 2048,
+      },
+    });
+
+    const response = result.response;
+    const text = response.text();
+    console.log('Gemini response received:', text.substring(0, 100) + '...');
+
+    if (!text) {
+      throw new Error('No response from Gemini');
     }
-    throw new Error(OLLAMA_CONFIG.messages.error);
+
+    return text;
+  } catch (error) {
+    console.error('Error calling Gemini:', error);
+    throw new Error('Failed to generate AI response. Please check your API key and try again.');
   }
 }
 
@@ -117,10 +116,9 @@ Rules:
 - Return ONLY the JSON, no other text`;
 
   try {
-    const response = await callOllama(
+    const response = await callGemini(
       prompt,
-      OLLAMA_CONFIG.temperature.parsing,
-      OLLAMA_CONFIG.timeout.parse
+      0.1 // Lower temperature for more consistent parsing
     );
 
     // Extract JSON from response (model might add extra text)
@@ -183,16 +181,15 @@ Focus on:
 - Practical recommendations`;
 
   try {
-    const response = await callOllama(
+    const response = await callGemini(
       prompt,
-      OLLAMA_CONFIG.temperature.analysis,
-      OLLAMA_CONFIG.timeout.insights
+      0.7 // Higher temperature for creative insights
     );
 
     const jsonMatch = response.match(/\[[\s\S]*\]/);
-    
+
     if (!jsonMatch) return [];
-    
+
     return JSON.parse(jsonMatch[0]) as SpendingInsight[];
   } catch (error) {
     console.error('Error generating insights:', error);
@@ -233,14 +230,13 @@ Consider:
 - Any unusual recent spending`;
 
   try {
-    const response = await callOllama(
+    const response = await callGemini(
       prompt,
-      OLLAMA_CONFIG.temperature.parsing,
-      OLLAMA_CONFIG.timeout.predictions
+      0.3 // Moderate temperature for predictions
     );
 
     const jsonMatch = response.match(/\{[\s\S]*\}/);
-    
+
     if (!jsonMatch) throw new Error('No prediction JSON');
 
     return JSON.parse(jsonMatch[0]) as SpendingPrediction;
@@ -280,10 +276,9 @@ Write a 3-4 paragraph summary that includes:
 Use a friendly, supportive tone. Use ₹ for currency.`;
 
   try {
-    const response = await callOllama(
+    const response = await callGemini(
       prompt,
-      OLLAMA_CONFIG.temperature.creative,
-      OLLAMA_CONFIG.timeout.summary
+      0.7 // Creative temperature for summaries
     );
 
     return response || 'Unable to generate summary.';
@@ -350,22 +345,13 @@ Generate alerts for:
 Return empty alerts array if nothing concerning.`;
 
   try {
-    const response = await fetch(OLLAMA_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: prompt,
-        stream: false,
-        temperature: 0.4,
-      }),
-    });
+    const response = await callGemini(
+      prompt,
+      0.4 // Moderate temperature for analysis
+    );
 
-    if (!response.ok) return { alerts: [] };
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
 
-    const data = await response.json();
-    const jsonMatch = data.response?.match(/\{[\s\S]*\}/);
-    
     if (!jsonMatch) return { alerts: [] };
 
     return JSON.parse(jsonMatch[0]);

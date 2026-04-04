@@ -99,10 +99,10 @@ export function usePredictiveInsights() {
   }, [user?.id, transactions, budgets, goals, patterns]);
 
   useEffect(() => {
-    if (patterns.length > 0) {
+    if (transactions.length > 0) {
       generateInsights();
     }
-  }, [generateInsights, patterns]);
+  }, [generateInsights, transactions.length]);
 
   return {
     insights,
@@ -218,10 +218,10 @@ export function useComprehensiveSummary() {
   }, [user?.id, transactions, budgets, goals, patterns]);
 
   useEffect(() => {
-    if (patterns.length > 0 && !summary) {
+    if (transactions.length > 0 && !summary) {
       generateSummary();
     }
-  }, [generateSummary, patterns, summary]);
+  }, [generateSummary, transactions.length, summary]);
 
   return {
     summary,

@@ -1,10 +1,15 @@
 /**
  * Smart Input Classifier Service
- * Uses Ollama AI to automatically classify user input as Transaction, Budget, or Goal
+ * Uses Gemini AI to automatically classify user input as Transaction, Budget, or Goal
  * and extract relevant structured data
  */
 
-import { OLLAMA_CONFIG } from '../constants/config';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Gemini Configuration
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'your-gemini-api-key-here';
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 export type InputType = 'transaction' | 'budget' | 'goal';
 
@@ -35,32 +40,23 @@ export interface ClassifiedInput {
 }
 
 /**
- * Classify user input using Ollama
+ * Classify user input using Gemini
  */
 export async function classifyUserInput(text: string): Promise<ClassifiedInput> {
   try {
     const prompt = createClassificationPrompt(text);
-    
-    const response = await fetch(`${OLLAMA_CONFIG.url}${OLLAMA_CONFIG.endpoints.generate}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.1, // Low temperature for consistent classification
+        maxOutputTokens: 1024,
       },
-      body: JSON.stringify({
-        model: OLLAMA_CONFIG.models.default,
-        prompt,
-        stream: false,
-        temperature: OLLAMA_CONFIG.temperature.parsing,
-      }),
     });
 
-    if (!response.ok) {
-      console.error('Ollama response error:', response.statusText);
-      return createDefaultClassification(text);
-    }
-
-    const result = await response.json();
-    const responseText = result.response || '';
+    const response = result.response;
+    const responseText = response.text() || '';
+    console.log('Gemini classification response:', responseText);
 
     // Parse the response
     return parseClassificationResponse(responseText, text);
@@ -97,6 +93,11 @@ Respond with this exact JSON format (all fields are optional except type and con
   "priority": "low" | "medium" | "high" or null
 }
 
+Important:
+- Amount must be a plain number only, without currency symbols.
+- If you cannot infer amount, category, or date, use null.
+- Do not add extra text, explanation, or markdown.
+
 CLASSIFICATION RULES:
 - TRANSACTION: Mentions spending/earning money, buying items, or payments (e.g., "spent ₹500 on groceries", "got paid ₹5000")
 - BUDGET: Mentions setting limits or budgets for spending (e.g., "set budget of ₹10000 for food", "limit spending to ₹500 weekly")
@@ -117,25 +118,31 @@ function parseClassificationResponse(responseText: string, originalText: string)
     }
 
     const parsed = JSON.parse(cleanResponse);
+    console.log('Parsed classification JSON:', parsed);
 
     // Ensure type is valid
     const type = (['transaction', 'budget', 'goal'].includes(parsed.type) ? parsed.type : 'transaction') as InputType;
     const confidence = Math.min(Math.max(parsed.confidence || 0.5, 0), 1);
+    const originalAmount = parseAmountValue(parsed.amount ?? parsed.amountString ?? parsed.amount_value);
+    const inferredAmount = originalAmount ?? extractAmount(originalText);
+    const dateValue = parseDateValue(parsed.date || parsed.deadline || parsed.transactionDate) ?? extractDate(originalText);
+    const inferredCategory = parsed.category || inferCategoryFromText(originalText);
+    const inferredTransactionType = parsed.transactionType || inferTransactionType(originalText);
 
     return {
       type,
       confidence,
       data: {
-        amount: parsed.amount ? parseFloat(parsed.amount.toString()) : undefined,
-        description: parsed.description || undefined,
-        date: parsed.date ? new Date(parsed.date) : undefined,
-        category: parsed.category || undefined,
-        transactionType: parsed.transactionType || undefined,
+        amount: inferredAmount ?? undefined,
+        description: parsed.description || originalText,
+        date: dateValue || undefined,
+        category: inferredCategory || undefined,
+        transactionType: inferredTransactionType || undefined,
         vendor: parsed.vendor || undefined,
         tags: Array.isArray(parsed.tags) ? parsed.tags : undefined,
         period: parsed.period || undefined,
         goalName: parsed.goalName || undefined,
-        deadline: parsed.deadline ? new Date(parsed.deadline) : undefined,
+        deadline: dateValue || undefined,
         priority: parsed.priority || undefined,
       },
       originalText,
@@ -155,20 +162,87 @@ function createDefaultClassification(text: string): ClassifiedInput {
   
   let type: InputType = 'transaction';
   
-  if (lowerText.includes('budget') || lowerText.includes('limit') || lowerText.includes('spend')) {
+  if (lowerText.includes('budget') || lowerText.includes('limit')) {
     type = 'budget';
   } else if (lowerText.includes('save') || lowerText.includes('goal') || lowerText.includes('target')) {
     type = 'goal';
+  } else if (lowerText.includes('spent') || lowerText.includes('paid') || lowerText.includes('bought') || lowerText.includes('purchased')) {
+    type = 'transaction';
   }
+
+  const inferredAmount = extractAmount(text);
+  const inferredCategory = inferCategoryFromText(text);
+  const inferredDate = extractDate(text);
 
   return {
     type,
     confidence: 0.5,
     data: {
       description: text,
+      amount: inferredAmount ?? undefined,
+      category: inferredCategory ?? undefined,
+      date: inferredDate ?? undefined,
+      transactionType: type === 'transaction' ? inferTransactionType(text) : undefined,
     },
     originalText: text,
   };
+}
+
+function parseAmountValue(value: unknown): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[₹$,]/g, '').trim();
+    const numberMatch = cleaned.match(/-?\d+(?:\.\d+)?/);
+    if (numberMatch) {
+      return parseFloat(numberMatch[0]);
+    }
+  }
+  return undefined;
+}
+
+function parseDateValue(value: unknown): Date | undefined {
+  if (!value) return undefined;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return undefined;
+}
+
+function inferCategoryFromText(text: string): string | undefined {
+  const mapping: Array<[RegExp, string]> = [
+    [/grocer|grocery|supermarket|zomato|swiggy|restaurant|dining|food/i, 'Groceries'],
+    [/rent|apartment|house/i, 'Rent'],
+    [/travel|uber|ola|taxi|train|bus|flight/i, 'Transportation'],
+    [/movie|netflix|spotify|entertainment|concert|game/i, 'Entertainment'],
+    [/health|doctor|pharmacy|medicine|clinic|hospital/i, 'Healthcare'],
+    [/shopping|amazon|mall|clothes|electronics|fashion/i, 'Shopping'],
+    [/salary|payroll|income|salary/i, 'Salary'],
+    [/gift|donation|charity/i, 'Gifts'],
+    [/utility|electric|water|internet|bill/i, 'Bills & Utilities'],
+    [/education|course|tuition|school/i, 'Education'],
+    [/insurance|loan|interest/i, 'Financial'],
+  ];
+
+  for (const [pattern, category] of mapping) {
+    if (pattern.test(text)) {
+      return category;
+    }
+  }
+  return undefined;
+}
+
+function inferTransactionType(text: string): 'income' | 'expense' | undefined {
+  const lowerText = text.toLowerCase();
+  if (/(received|income|salary|credited|got paid)/i.test(lowerText)) {
+    return 'income';
+  }
+  if (/(spent|paid|bought|purchased|deducted|charged)/i.test(lowerText)) {
+    return 'expense';
+  }
+  return undefined;
 }
 
 /**

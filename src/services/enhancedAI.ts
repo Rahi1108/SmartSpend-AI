@@ -1,8 +1,12 @@
 // Enhanced AI Service for SmartSpend AI
 // Comprehensive AI system with behavioral insights, predictive analytics, and smart categorization
 
-import { OLLAMA_CONFIG } from '../constants/config';
-import { getOllamaStatus } from './ollama';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Gemini Configuration
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'your-gemini-api-key-here';
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 export interface Transaction {
   id: string;
@@ -90,9 +94,14 @@ export class AIService {
     const cutoffDate = new Date();
     cutoffDate.setMonth(cutoffDate.getMonth() - months);
 
-    const recentTransactions = transactions.filter(t =>
+    let recentTransactions = transactions.filter(t =>
       new Date(t.date) >= cutoffDate
     );
+
+    if (recentTransactions.length === 0) {
+      // Fallback to full history when no transactions are available in the last period
+      recentTransactions = transactions;
+    }
 
     const patterns: Record<string, BehavioralPattern> = {};
 
@@ -312,7 +321,7 @@ Respond ONLY with valid JSON:
 }`;
 
     try {
-      const response = await this.callOllama(prompt, 0.2);
+      const response = await this.callGemini(prompt, 0.2);
       const result = JSON.parse(response.match(/\{[\s\S]*\}/)?.[0] || '{}');
 
       const suggestedCategory = result.category || 'Other';
@@ -377,7 +386,7 @@ Respond ONLY with valid JSON:
 }`;
 
     try {
-      const response = await this.callOllama(prompt, 0.3);
+      const response = await this.callGemini(prompt, 0.3);
       const result = JSON.parse(response.match(/\{[\s\S]*\}/)?.[0] || '{}');
 
       return {
@@ -410,86 +419,90 @@ Respond ONLY with valid JSON:
     recommendations: string[];
     riskAssessment: string;
   }> {
-    const prompt = `You are a comprehensive financial advisor. Analyze this user's financial data and provide a detailed assessment.
+    const insights = await this.generatePredictiveInsights(_userId, _transactions, budgets, goals, patterns);
+    const recommendations = await this.generateRecommendations(_transactions, budgets, goals, patterns);
+    const riskAssessment = this.assessFinancialRisks(_transactions, budgets, goals, patterns);
+    const overview = this.generateLocalSummary(_transactions, budgets, goals, patterns, insights, recommendations, riskAssessment);
 
-TRANSACTIONS (last 30 days):
-${JSON.stringify(_transactions.slice(0, 50), null, 2)}
+    return {
+      overview,
+      insights,
+      recommendations,
+      riskAssessment,
+    };
+  }
 
-BUDGETS:
-${JSON.stringify(budgets, null, 2)}
+  private generateLocalSummary(
+    transactions: Transaction[],
+    budgets: Budget[],
+    goals: Goal[],
+    patterns: BehavioralPattern[],
+    insights: PredictiveInsight[],
+    recommendations: string[],
+    riskAssessment: string
+  ): string {
+    const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const expenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const net = income - expenses;
 
-GOALS:
-${JSON.stringify(goals, null, 2)}
+    const expenseByCategory = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((acc, t) => {
+        acc[t.category_name] = (acc[t.category_name] || 0) + t.amount;
+        return acc;
+      }, {} as Record<string, number>);
 
-SPENDING PATTERNS:
-${JSON.stringify(patterns.slice(0, 10), null, 2)}
+    const topCategories = Object.entries(expenseByCategory)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([category, amount]) => `${category} (₹${amount.toFixed(0)})`);
 
-Provide a comprehensive financial summary including:
-1. Overall financial health assessment
-2. Key insights and trends
-3. Specific recommendations
-4. Risk assessment
+    const topGoal = goals
+      .map(goal => ({
+        name: goal.name,
+        progress: Math.min(100, (goal.current_amount / goal.target_amount) * 100),
+      }))
+      .sort((a, b) => b.progress - a.progress)[0];
 
-Use ₹ for currency. Be encouraging and actionable.`;
+    const topInsight = insights[0]?.title ? `Primary insight: ${insights[0].title}. ` : '';
+    const topRecommendation = recommendations[0] ? `Top recommendation: ${recommendations[0]}. ` : '';
 
-    try {
-      const response = await this.callOllama(prompt, 0.4, 30000); // Longer timeout for comprehensive analysis
-
-      // Parse the response and structure it
-      const overview = response;
-
-      // Generate insights using existing methods
-      const insights = await this.generatePredictiveInsights(_userId, _transactions, budgets, goals, patterns);
-
-      // Generate recommendations
-      const recommendations = await this.generateRecommendations(_transactions, budgets, goals, patterns);
-
-      // Risk assessment
-      const riskAssessment = this.assessFinancialRisks(_transactions, budgets, goals, patterns);
-
-      return {
-        overview,
-        insights,
-        recommendations,
-        riskAssessment,
-      };
-    } catch (error) {
-      console.error('Error generating comprehensive summary:', error);
-      return {
-        overview: 'Unable to generate comprehensive financial summary at this time.',
-        insights: [],
-        recommendations: ['Please ensure your data is up to date for better insights.'],
-        riskAssessment: 'Unable to assess financial risks at this time.',
-      };
+    let summary = `You have ₹${income.toFixed(0)} in income and ₹${expenses.toFixed(0)} in expenses with a net balance of ₹${net.toFixed(0)}.`;
+    if (topCategories.length > 0) {
+      summary += ` Your top spending categories are ${topCategories.join(', ')}.`;
     }
+    if (topGoal) {
+      summary += ` Your strongest goal progress is for ${topGoal.name} at ${topGoal.progress.toFixed(0)}% complete.`;
+    }
+    summary += ` ${topInsight}${topRecommendation} ${riskAssessment}`;
+
+    return summary;
   }
 
   // Private helper methods
 
-  private async callOllama(prompt: string, temperature: number = 0.3, timeout: number = 10000): Promise<string> {
-    const status = getOllamaStatus();
-    if (!status.isOnline) {
-      throw new Error('AI service is currently offline');
+  private async callGemini(prompt: string, temperature: number = 0.3): Promise<string> {
+    try {
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: temperature,
+          maxOutputTokens: 4096,
+        },
+      });
+
+      const response = result.response;
+      const text = response.text();
+
+      if (!text) {
+        throw new Error('No response from Gemini');
+      }
+
+      return text;
+    } catch (error) {
+      console.error('Error calling Gemini:', error);
+      throw new Error('Failed to generate AI response. Please check your API key and try again.');
     }
-
-    const response = await fetch(`${OLLAMA_CONFIG.url}${OLLAMA_CONFIG.endpoints.generate}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_CONFIG.models.default,
-        prompt,
-        stream: false,
-        temperature,
-      }),
-      signal: AbortSignal.timeout(timeout),
-    });
-
-    if (!response.ok) {
-      throw new Error(`AI service error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.response || '';
   }
 
   private getLearningData(userId: string): AILearningData {
