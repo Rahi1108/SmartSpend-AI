@@ -2,30 +2,58 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
 
+/* Light Theme */
 :root {
-  --color-background: #071124;
-  --color-background-secondary: #0a1929;
-  --color-background-tertiary: #0d2137;
-  --color-glass: rgba(250, 200, 100, 0.04);
-  --color-glass-hover: rgba(255, 255, 255, 0.08);
-  --color-glass-border: rgba(255, 255, 255, 0.1);
-  --color-accent-purple: #5D3FD3;
-  --color-accent-pink: #e9aec3;
-  --color-accent-teal: #00C2A8;
-  --color-accent-blue: #3B82F6;
-  --color-text-primary: #E6EEF8;
-  --color-text-secondary: #A8B3C6;
-  --color-text-muted: #6B7A90;
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-error: #EF4444;
+  --color-background: #ffffff;
+  --color-background-secondary: #f8fafc;
+  --color-background-tertiary: #f1f5f9;
+  --color-glass: rgba(255, 255, 255, 0.8);
+  --color-glass-hover: rgba(255, 255, 255, 0.9);
+  --color-glass-border: rgba(0, 0, 0, 0.1);
+  --color-accent-purple: #6366f1;
+  --color-accent-pink: #ec4899;
+  --color-accent-teal: #14b8a6;
+  --color-accent-blue: #3b82f6;
+  --color-accent-green: #10b981;
+  --color-accent-orange: #f97316;
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
   --font-family-sans: 'Inter', 'system-ui', 'sans-serif';
   --font-family-heading: 'Poppins', 'system-ui', 'sans-serif';
-  --gradient-primary: linear-gradient(135deg, #FF4D8A 100%);
-  --gradient-secondary: linear-gradient(135deg, #00C2A8 0%, #3B82F6 100%);
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --gradient-secondary: linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%);
+  --shadow-glass: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-glow-purple: 0 0 20px rgba(99, 102, 241, 0.3);
+  --shadow-glow-teal: 0 0 20px rgba(20, 184, 166, 0.3);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --color-background: #0f172a;
+  --color-background-secondary: #1e293b;
+  --color-background-tertiary: #334155;
+  --color-glass: rgba(30, 41, 59, 0.8);
+  --color-glass-hover: rgba(51, 65, 85, 0.9);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-accent-purple: #818cf8;
+  --color-accent-pink: #f472b6;
+  --color-accent-teal: #5eead4;
+  --color-accent-blue: #60a5fa;
+  --color-accent-green: #34d399;
+  --color-accent-orange: #fb923c;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
   --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.3);
-  --shadow-glow-purple: 0 0 20px rgba(93, 63, 211, 0.3);
-  --shadow-glow-teal: 0 0 20px rgba(0, 194, 168, 0.3);
+  --shadow-glow-purple: 0 0 20px rgba(129, 140, 248, 0.3);
+  --shadow-glow-teal: 0 0 20px rgba(94, 234, 212, 0.3);
 }
 
 * {
@@ -40,6 +68,7 @@ body {
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .bg-background { background-color: var(--color-background); }

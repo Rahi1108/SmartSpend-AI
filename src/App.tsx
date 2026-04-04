@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
+import { useUIStore } from './stores/uiStore';
+import { startOllamaHealthCheck } from './services/ollama';
 import { LandingPage } from './pages/LandingPage';
 import { Dashboard } from './pages/Dashboard';
 import { TransactionsPage } from './pages/TransactionsPage';
@@ -15,10 +17,17 @@ import { AppLayout } from './components/layout/AppLayout';
 
 function App() {
   const { initialize } = useAuthStore();
+  const { theme, setTheme } = useUIStore();
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+
+    // Start Ollama health checks on app initialization
+    startOllamaHealthCheck(30000); // Check every 30 seconds
+
+    // Initialize theme on app start
+    setTheme(theme);
+  }, [initialize, theme, setTheme]);
 
   return (
     <BrowserRouter>

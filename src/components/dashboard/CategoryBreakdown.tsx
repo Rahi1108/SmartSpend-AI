@@ -1,6 +1,6 @@
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 
 interface CategoryBreakdownProps {
@@ -30,33 +30,6 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ data }) =>
   // Sort by amount descending to show top categories
   const topCategories = [...dataWithPercentage].sort((a, b) => b.amount - a.amount).slice(0, 5);
   const otherTotal = data.slice(5).reduce((sum, item) => sum + item.amount, 0);
-
-  const customLabel = ({ cx, cy }: { cx: number; cy: number }) => {
-    return (
-      <g>
-        <text
-          x={cx}
-          y={cy - 10}
-          fill="currentColor"
-          textAnchor="middle"
-          className="font-bold text-text-primary"
-          fontSize={18}
-        >
-          ₹{(total / 1000).toFixed(1)}K
-        </text>
-        <text
-          x={cx}
-          y={cy + 15}
-          fill="currentColor"
-          textAnchor="middle"
-          className="text-text-secondary"
-          fontSize={12}
-        >
-          Total Spent
-        </text>
-      </g>
-    );
-  };
 
   return (
     <div className="w-full space-y-6">
@@ -90,8 +63,10 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ data }) =>
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`}
-                  labelFormatter={(label: string) => label}
+                  formatter={(value: unknown) => {
+                    const numValue = typeof value === 'number' ? value : 0;
+                    return `₹${numValue.toLocaleString('en-IN')}`;
+                  }}
                   contentStyle={{
                     backgroundColor: 'rgba(0, 0, 0, 0.8)',
                     border: 'none',

@@ -1,6 +1,9 @@
-// Ollama Configuration - runs locally at http://localhost:11434
-const OLLAMA_URL = 'http://localhost:11434/api/generate';
-const OLLAMA_MODEL = 'mistral'; // or 'neural-chat' for faster, 'dolphin-mixtral' for better
+import { OLLAMA_CONFIG } from '../constants/config';
+import { getOllamaStatus } from './ollama';
+
+// Ollama Configuration
+const OLLAMA_URL = `${OLLAMA_CONFIG.url}${OLLAMA_CONFIG.endpoints.generate}`;
+const OLLAMA_MODEL = OLLAMA_CONFIG.models.default;
 
 // Types for AI responses
 export interface ParsedExpense {
@@ -26,6 +29,65 @@ export interface SpendingPrediction {
   projectedByCategory: Record<string, number>;
   trend: 'increasing' | 'decreasing' | 'stable';
   warnings: string[];
+}
+
+/**
+ * Utility function to call Ollama API with timeout
+ */
+async function callOllama(
+  prompt: string,
+  temperature: number = 0.3,
+  timeoutMs: number = OLLAMA_CONFIG.timeout.parse
+): Promise<string> {
+  const status = getOllamaStatus();
+  if (!status.isOnline) {
+    throw new Error(OLLAMA_CONFIG.messages.offline);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(OLLAMA_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt: prompt,
+        stream: false,
+        temperature: temperature,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(OLLAMA_CONFIG.messages.noModel);
+      }
+      throw new Error(`${OLLAMA_CONFIG.messages.error} (${response.status})`);
+    }
+
+    const data = await response.json();
+
+    if (!data.response) {
+      throw new Error('No response from Ollama');
+    }
+
+    return data.response;
+  } catch (error) {
+    clearTimeout(timer);
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error(OLLAMA_CONFIG.messages.timeout);
+      }
+      throw error;
+    }
+    throw new Error(OLLAMA_CONFIG.messages.error);
+  }
 }
 
 // Parse natural language expense input using Ollama
@@ -55,42 +117,23 @@ Rules:
 - Return ONLY the JSON, no other text`;
 
   try {
-    const response = await fetch(OLLAMA_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: prompt,
-        stream: false,
-        temperature: 0.3, // Lower temperature for more consistent parsing
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (!data.response) {
-      throw new Error('No response from Ollama');
-    }
+    const response = await callOllama(
+      prompt,
+      OLLAMA_CONFIG.temperature.parsing,
+      OLLAMA_CONFIG.timeout.parse
+    );
 
     // Extract JSON from response (model might add extra text)
-    const jsonMatch = data.response.match(/\{[\s\S]*\}/);
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.error('Response:', data.response);
+      console.error('Response:', response);
       throw new Error('Could not extract JSON from response');
     }
 
     const parsed = JSON.parse(jsonMatch[0]) as ParsedExpense;
     return parsed;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('fetch')) {
-      throw new Error('Could not connect to Ollama. Make sure Ollama is running on http://localhost:11434');
-    }
+    console.error('Error parsing expense:', error);
     throw error;
   }
 }
@@ -140,21 +183,13 @@ Focus on:
 - Practical recommendations`;
 
   try {
-    const response = await fetch(OLLAMA_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: prompt,
-        stream: false,
-        temperature: 0.5,
-      }),
-    });
+    const response = await callOllama(
+      prompt,
+      OLLAMA_CONFIG.temperature.analysis,
+      OLLAMA_CONFIG.timeout.insights
+    );
 
-    if (!response.ok) return [];
-
-    const data = await response.json();
-    const jsonMatch = data.response?.match(/\[[\s\S]*\]/);
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
     
     if (!jsonMatch) return [];
     
@@ -198,21 +233,13 @@ Consider:
 - Any unusual recent spending`;
 
   try {
-    const response = await fetch(OLLAMA_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: prompt,
-        stream: false,
-        temperature: 0.3,
-      }),
-    });
+    const response = await callOllama(
+      prompt,
+      OLLAMA_CONFIG.temperature.parsing,
+      OLLAMA_CONFIG.timeout.predictions
+    );
 
-    if (!response.ok) throw new Error('Prediction failed');
-
-    const data = await response.json();
-    const jsonMatch = data.response?.match(/\{[\s\S]*\}/);
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
     
     if (!jsonMatch) throw new Error('No prediction JSON');
 
@@ -253,21 +280,13 @@ Write a 3-4 paragraph summary that includes:
 Use a friendly, supportive tone. Use ₹ for currency.`;
 
   try {
-    const response = await fetch(OLLAMA_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: prompt,
-        stream: false,
-        temperature: 0.7,
-      }),
-    });
+    const response = await callOllama(
+      prompt,
+      OLLAMA_CONFIG.temperature.creative,
+      OLLAMA_CONFIG.timeout.summary
+    );
 
-    if (!response.ok) return 'Unable to generate summary.';
-
-    const data = await response.json();
-    return data.response || 'Unable to generate summary.';
+    return response || 'Unable to generate summary.';
   } catch (error) {
     console.error('Error generating summary:', error);
     return 'Unable to generate summary at this moment.';
