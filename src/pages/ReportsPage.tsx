@@ -51,14 +51,13 @@ export const ReportsPage: React.FC = () => {
         return acc;
       }, {} as Record<string, number>);
 
-    // Monthly trend (last 6 months)
+    // Monthly trend (12 months of selected year)
     const monthlyData = [];
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(selectedYear, i, 1);
       const monthTransactions = transactions.filter(t => {
         const tDate = new Date(t.date);
-        return tDate.getMonth() === date.getMonth() && tDate.getFullYear() === date.getFullYear();
+        return tDate.getMonth() === i && tDate.getFullYear() === selectedYear;
       });
 
       const monthIncome = monthTransactions
@@ -70,7 +69,7 @@ export const ReportsPage: React.FC = () => {
         .reduce((sum, t) => sum + t.amount, 0);
 
       monthlyData.push({
-        month: getMonthName(date.getMonth()),
+        period: getMonthName(i),
         income: monthIncome,
         expenses: monthExpenses,
         net: monthIncome - monthExpenses,
