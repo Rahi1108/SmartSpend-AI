@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MicrophoneIcon, CalendarDaysIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../stores/authStore';
 import { useTransactions } from '../hooks/useTransactions';
 import { useBudgets } from '../hooks/useBudgets';
@@ -21,7 +21,7 @@ export const Dashboard: React.FC = () => {
   const { user, profile } = useAuthStore();
   const userId = user?.id || 'user1';
   const { transactions, createTransaction } = useTransactions();
-  const { budgets, createBudget } = useBudgets();
+  const { createBudget } = useBudgets();
   const { createGoal } = useGoals();
 
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
@@ -124,31 +124,25 @@ export const Dashboard: React.FC = () => {
       if (Number.isNaN(parsedDate.getTime())) return;
 
       let periodKey: string;
-      let displayLabel: string;
 
       switch (chartPeriod) {
         case 'daily':
           periodKey = parsedDate.toISOString().split('T')[0]; // YYYY-MM-DD
-          displayLabel = parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
           break;
         case 'weekly':
           const weekStart = new Date(parsedDate);
           weekStart.setDate(parsedDate.getDate() - parsedDate.getDay()); // Start of week (Sunday)
           periodKey = weekStart.toISOString().split('T')[0];
-          displayLabel = `Week of ${weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
           break;
         case 'monthly':
           periodKey = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}`;
-          displayLabel = parsedDate.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
           break;
         case 'yearly':
           periodKey = String(parsedDate.getFullYear());
-          displayLabel = String(parsedDate.getFullYear());
           break;
         case 'datewise':
         default:
           periodKey = parsedDate.toISOString().split('T')[0];
-          displayLabel = parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
           break;
       }
 

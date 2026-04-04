@@ -54,7 +54,6 @@ export const ReportsPage: React.FC = () => {
     // Monthly trend (12 months of selected year)
     const monthlyData = [];
     for (let i = 0; i < 12; i++) {
-      const date = new Date(selectedYear, i, 1);
       const monthTransactions = transactions.filter(t => {
         const tDate = new Date(t.date);
         return tDate.getMonth() === i && tDate.getFullYear() === selectedYear;

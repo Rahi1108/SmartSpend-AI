@@ -6,7 +6,6 @@ import {
   updateBudget,
   deleteBudget,
 } from '../services/budgets';
-import { notificationService } from '../services/notifications';
 import type { Budget, Database } from '../types/database';
 
 type BudgetInsert = Database['public']['Tables']['budgets']['Insert'];

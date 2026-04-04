@@ -6,7 +6,6 @@ import {
   updateGoal,
   deleteGoal,
 } from '../services/goals';
-import { notificationService } from '../services/notifications';
 import type { Goal, Database } from '../types/database';
 
 type GoalInsert = Database['public']['Tables']['goals']['Insert'];

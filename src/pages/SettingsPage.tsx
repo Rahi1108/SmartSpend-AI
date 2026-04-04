@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Shield, Database, LogOut } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { useUIStore } from '../stores/uiStore';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';

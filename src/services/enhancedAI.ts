@@ -89,6 +89,7 @@ export class AIService {
     transactions: Transaction[],
     months: number = 6
   ): Promise<BehavioralPattern[]> {
+    void userId;
     if (transactions.length === 0) return [];
 
     const cutoffDate = new Date();
@@ -441,6 +442,8 @@ Respond ONLY with valid JSON:
     recommendations: string[],
     riskAssessment: string
   ): string {
+    void budgets;
+    void patterns;
     const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const expenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const net = income - expenses;
@@ -548,6 +551,7 @@ Respond ONLY with valid JSON:
     goals: Goal[],
     patterns: BehavioralPattern[]
   ): Promise<string[]> {
+    void transactions;
     const recommendations: string[] = [];
 
     // Budget recommendations
