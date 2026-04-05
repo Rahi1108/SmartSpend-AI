@@ -1,5 +1,8 @@
 // Notification manager to handle periodic checks and trigger notifications
 import { notificationService } from './notifications';
+import { getBudgets } from './budgets';
+import { getGoals } from './goals';
+import { getTransactions } from './transactions';
 
 export class NotificationManager {
   private static instance: NotificationManager;
@@ -42,11 +45,6 @@ export class NotificationManager {
       if (!notificationService.hasNotificationsEnabled(userId)) {
         return;
       }
-
-      // Import services dynamically to avoid circular dependencies
-      const { getBudgets } = await import('./budgets');
-      const { getGoals } = await import('./goals');
-      const { getTransactions } = await import('./transactions');
 
       // Get current data
       const [budgets, goals, transactions] = await Promise.all([
